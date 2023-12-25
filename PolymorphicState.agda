@@ -303,7 +303,11 @@ record AssocProp' (def : JoinDef) : Set where
   g' : S → S → S
   g' s1 s2 = foldT (B s1) (C s1) s2 t
 
-  -- Originally l' and r'
+  fl : S
+  fl = foldT f g Leaf l
+
+  fr : S
+  fr = foldT f g Leaf r
 
   fl' : S
   fl' = foldT A g' Leaf l
@@ -313,9 +317,9 @@ record AssocProp' (def : JoinDef) : Set where
 
   field
     eq5 : foldT f g Leaf t ≡ foldT A g' Leaf t
-    eq6 : foldT A B (foldT f g Leaf l) l ≡ fl'
-    eq7 : foldT A B (foldT f g Leaf l) r ≡ foldT (B fl') (C fl') fr' l
-    eq8 : foldT f g Leaf r ≡ foldT (B fl') (C fl') fr' r
+    eq6 : foldT A B fl l ≡ fl'
+    eq7 : foldT A B fl r ≡ foldT (B fl') (C fl') fr' l
+    eq8 : fr ≡ foldT (B fl') (C fl') fr' r
 
 makeAssocProp' : (def : JoinDef) → assocLHS def ≡ assocRHS def → AssocProp' def
 makeAssocProp' def eqs = record {
@@ -523,18 +527,53 @@ pathʳ = foldS (λ s → At ∷ s) (λ _ s → Bt ∷ s) (λ _ _ s → Ct ∷ s)
 rightAppender1 : (S → S) → Set
 rightAppender1 f = ∀ (x : S) → pathʳ (f x) ≡ pathʳ (f Leaf) ++ pathʳ x
 
-pathʳ-iterByFs :
-  ∀(t : T) (f : S → S) {g : _} (x : S)
+rightAppender2 : (S → S → S) → Set
+rightAppender2 g = ∀ (x y : S) → pathʳ (g x y) ≡ pathʳ (g Leaf Leaf) ++ pathʳ y
+
+pathʳ-foldT : 
+  ∀(f : S → S) (g : S → S → S) (x : S) (t : T)
+  → rightAppender1 f → rightAppender2 g
+  → pathʳ (foldT f g x t) ≡ pathʳ (foldT f g Leaf t) ++ pathʳ x
+pathʳ-foldT f g x (F t) appf appg = begin
+    pathʳ (foldT f g x (F t))
+  ≡⟨ refl ⟩
+    pathʳ (f (foldT f g x t))
+  ≡⟨ appf (foldT f g x t) ⟩
+    pathʳ (f Leaf) ++ pathʳ (foldT f g x t)
+  ≡⟨ cong₂ _++_ refl (pathʳ-foldT f g x t appf appg) ⟩
+    pathʳ (f Leaf) ++ (pathʳ (foldT f g Leaf t) ++ pathʳ x)
+  ≡⟨ sym (ListProp.++-assoc (pathʳ (f Leaf)) (pathʳ (foldT f g Leaf t)) _) ⟩
+    (pathʳ (f Leaf) ++ pathʳ (foldT f g Leaf t)) ++ pathʳ x
+  ≡⟨ cong₂ _++_ (sym (appf (foldT f g Leaf t))) refl ⟩
+    pathʳ (foldT f g Leaf (F t)) ++ pathʳ x
+  ∎
+pathʳ-foldT f g x (G u t) appf appg = begin
+    pathʳ (foldT f g x (G u t))
+  ≡⟨ refl ⟩
+    pathʳ (g (foldT f g x u) (foldT f g x t))
+  ≡⟨ appg _ (foldT f g x t) ⟩
+    pathʳ (g Leaf Leaf) ++ pathʳ (foldT f g x t)
+  ≡⟨ cong₂ _++_ refl (pathʳ-foldT f g x t appf appg) ⟩
+    pathʳ (g Leaf Leaf) ++ (pathʳ (foldT f g Leaf t) ++ pathʳ x)
+  ≡⟨ sym (ListProp.++-assoc (pathʳ (g Leaf Leaf)) (pathʳ (foldT f g Leaf t)) _) ⟩
+    (pathʳ (g Leaf Leaf) ++ pathʳ (foldT f g Leaf t)) ++ pathʳ x
+  ≡⟨ cong₂ _++_ (sym (appg _ (foldT f g Leaf t))) refl ⟩
+    pathʳ (foldT f g Leaf (G u t)) ++ pathʳ x
+  ∎
+pathʳ-foldT f g x X appf appg = refl
+
+pathʳ-foldT-Fs :
+  ∀(f : S → S) (g : S → S → S) (x : S) (t : T)
   → countGs t ≡ 0
   → rightAppender1 f
   → pathʳ (foldT f g x t) ≡ pathʳ (f Leaf) ^^ countFs t ++ pathʳ x
-pathʳ-iterByFs (F t) f {g = g} x noGs appender = begin
+pathʳ-foldT-Fs f g x (F t) noGs app = begin
     pathʳ (foldT f g x (F t))
   ≡⟨⟩
     pathʳ (f (foldT f g x t))
-  ≡⟨ appender (foldT f g x t) ⟩
+  ≡⟨ app (foldT f g x t) ⟩
     pathʳ (f Leaf) ++ pathʳ (foldT f g x t)
-  ≡⟨ cong₂ _++_ refl (pathʳ-iterByFs t f x noGs appender) ⟩
+  ≡⟨ cong₂ _++_ refl (pathʳ-foldT-Fs f g x t noGs app) ⟩
     pathʳ (f Leaf) ++ (pathʳ (f Leaf) ^^ countFs t) ++ pathʳ x
   ≡˘⟨ ListProp.++-assoc (pathʳ (f Leaf)) (repeatN (countFs t) (pathʳ (f Leaf))) _ ⟩
     (pathʳ (f Leaf) ++ pathʳ (f Leaf) ^^ countFs t) ++ pathʳ x
@@ -543,23 +582,20 @@ pathʳ-iterByFs (F t) f {g = g} x noGs appender = begin
   ≡⟨⟩
     pathʳ (f Leaf) ^^ countFs (F t) ++ pathʳ x
   ∎ 
-pathʳ-iterByFs X f {g = g} x noGs appenderProp = refl
+pathʳ-foldT-Fs f g x X noGs app = refl
 
-rightAppender2 : (S → S → S) → Set
-rightAppender2 g = ∀ (x y : S) → pathʳ (g x y) ≡ pathʳ (g Leaf Leaf) ++ pathʳ y
-
-pathʳ-iterByGs :
-  ∀(t : T) { f } (g : S → S → S) (x : S)
+pathʳ-foldT-Gs :
+  ∀(f : S → S) (g : S → S → S) (x : S) (t : T)
   → countFs t ≡ 0
   → rightAppender2 g
   → pathʳ (foldT f g x t) ≡ pathʳ (g Leaf Leaf) ^^ countGs t ++ pathʳ x
-pathʳ-iterByGs (G t' t) {f = f} g x noFs appender = begin
+pathʳ-foldT-Gs f g x (G t' t) noFs app = begin
     pathʳ (foldT f g x (G t' t))
   ≡⟨⟩
     pathʳ (g (foldT f g x t') (foldT f g x t))
-  ≡⟨ appender (foldT f g x t') (foldT f g x t) ⟩
+  ≡⟨ app (foldT f g x t') (foldT f g x t) ⟩
     pathʳ (g Leaf Leaf) ++ pathʳ (foldT f g x t)
-  ≡⟨ cong₂ _++_ refl (pathʳ-iterByGs t g x noFs appender) ⟩
+  ≡⟨ cong₂ _++_ refl (pathʳ-foldT-Gs f g x t noFs app) ⟩
     pathʳ (g Leaf Leaf) ++ (pathʳ (g Leaf Leaf) ^^ countGs t ++ pathʳ x)
   ≡˘⟨ ListProp.++-assoc (pathʳ (g Leaf Leaf)) (pathʳ (g Leaf Leaf) ^^ countGs t) _ ⟩
     (pathʳ (g Leaf Leaf) ++ pathʳ (g Leaf Leaf) ^^ countGs t) ++ pathʳ x
@@ -568,7 +604,7 @@ pathʳ-iterByGs (G t' t) {f = f} g x noFs appender = begin
   ≡⟨⟩
     pathʳ (g Leaf Leaf) ^^ countGs (G t' t) ++ pathʳ x
   ∎
-pathʳ-iterByGs X {f = f} g x noFs appender = refl
+pathʳ-foldT-Gs f g x X noFs appender = refl
 
 ------------------------------------
 
@@ -611,36 +647,12 @@ module StateMonadUniquenessImpl (def : JoinDef) (props : MonadProp def) where
       appenderB _ x = refl
 
       appenderF : ∀ (t : T) → rightAppender1 (λ { x → foldT A B x t })
-      appenderF (F t) x =
-        begin
-          pathʳ (foldT A B x (F t))
-        ≡⟨⟩
-          At ∷ pathʳ (foldT A B x t)
-        ≡⟨ cong (_∷_ At) (appenderF t x) ⟩
-          At ∷ (pathʳ (foldT A B Leaf t) ++ pathʳ x)
-        ≡⟨⟩
-          pathʳ (foldT A B Leaf (F t)) ++ pathʳ x
-        ∎
-      appenderF (G t' t) x = begin
-          pathʳ (foldT A B x (G t' t))
-        ≡⟨⟩
-          Bt ∷ pathʳ (foldT A B x t)
-        ≡⟨ cong (_∷_ Bt) (appenderF t x) ⟩
-          Bt ∷ (pathʳ (foldT A B Leaf t) ++ pathʳ x)
-        ≡⟨⟩
-          pathʳ (foldT A B Leaf (G t' t)) ++ pathʳ x
-        ∎
+      appenderF (F t) x = cong (_∷_ At) (appenderF t x)
+      appenderF (G _ t) x = cong (_∷_ Bt) (appenderF t x)
       appenderF X x = refl
 
-      pathʳ-eq8-lhs : pathʳ (foldT f g Leaf r) ≡ pathʳ (foldT A B Leaf t) ^^ r-depth 
-      pathʳ-eq8-lhs =
-        begin
-          pathʳ (foldT f g Leaf r)
-        ≡⟨ pathʳ-iterByFs r f Leaf eq2 (appenderF t) ⟩
-          repeatN r-depth (pathʳ (foldT A B Leaf t)) ++ pathʳ Leaf
-        ≡⟨ ListProp.++-identityʳ _ ⟩
-          repeatN r-depth (pathʳ (foldT A B Leaf t))
-        ∎
+      pathʳ-t : List STag
+      pathʳ-t = pathʳ (foldT A B Leaf t)
 
       pathʳ-fr' : pathʳ fr' ≡ [ At ] ^^ r-depth
       pathʳ-fr' =
@@ -648,17 +660,27 @@ module StateMonadUniquenessImpl (def : JoinDef) (props : MonadProp def) where
           pathʳ fr'
         ≡⟨⟩
           pathʳ (foldT A g' Leaf r)
-        ≡⟨ pathʳ-iterByFs r A Leaf eq2 appenderA ⟩
+        ≡⟨ pathʳ-foldT-Fs A _ Leaf r eq2 appenderA ⟩
           repeatN r-depth [ At ] ++ []
         ≡⟨ ListProp.++-identityʳ _ ⟩
           repeatN r-depth [ At ]
         ∎
 
+      pathʳ-eq8-lhs : pathʳ (foldT f g Leaf r) ≡ pathʳ-t ^^ r-depth 
+      pathʳ-eq8-lhs =
+        begin
+          pathʳ (foldT f g Leaf r)
+        ≡⟨ pathʳ-foldT-Fs f g Leaf r eq2 (appenderF t) ⟩
+          repeatN r-depth pathʳ-t ++ pathʳ Leaf
+        ≡⟨ ListProp.++-identityʳ _ ⟩
+          repeatN r-depth pathʳ-t
+        ∎
+      
       pathʳ-eq8-rhs : pathʳ (foldT (B fl') (C fl') fr' r) ≡ [ Bt ] ^^ r-depth ++ [ At ] ^^ r-depth
       pathʳ-eq8-rhs =
         begin
           pathʳ (foldT (B fl') (C fl') fr' r)
-        ≡⟨ pathʳ-iterByFs r (B fl') fr' eq2 (appenderB fl') ⟩
+        ≡⟨ pathʳ-foldT-Fs (B fl') (C fl') fr' r eq2 (appenderB fl') ⟩
           [ Bt ] ^^ r-depth ++ pathʳ fr'
         ≡⟨ cong (_++_ ([ Bt ] ^^ r-depth)) pathʳ-fr' ⟩
           [ Bt ] ^^ r-depth ++ [ At ] ^^ r-depth
@@ -673,25 +695,85 @@ module StateMonadUniquenessImpl (def : JoinDef) (props : MonadProp def) where
       appender2G : rightAppender2 g
       appender2G x y = refl
 
-      pathʳ-eq6-lhs : pathʳ (foldT A B (foldT f g Leaf l) l) ≡  [ Bt ] ^^ l-depth ++ [ Ct ] ^^ l-depth
+      appender2g' : ∀ (t : T) → rightAppender2 (λ x y → foldT (B x) (C x) y t)
+      appender2g' (F t₁) x y = cong (_∷_ Bt) (appender2g' t₁ x y)
+      appender2g' (G t₁ t₂) x y = cong (_∷_ Ct) (appender2g' t₂ x y)
+      appender2g' X x y = refl
+
+      pathʳ-fl : pathʳ fl ≡ [ Ct ] ^^ l-depth
+      pathʳ-fl = begin
+          pathʳ (foldT f g Leaf l)
+        ≡⟨ pathʳ-foldT-Gs f g Leaf l eq4 appender2G ⟩
+          [ Ct ] ^^ l-depth ++ []
+        ≡⟨ ListProp.++-identityʳ ([ Ct ] ^^ l-depth) ⟩
+          [ Ct ] ^^ l-depth
+        ∎
+      
+      pathʳ-eq6-lhs : pathʳ (foldT A B fl l) ≡  [ Bt ] ^^ l-depth ++ [ Ct ] ^^ l-depth
       pathʳ-eq6-lhs = begin
-          pathʳ (foldT A B (foldT f g Leaf l) l)
-        ≡⟨ pathʳ-iterByGs l B (foldT f g Leaf l) eq4 appender2B ⟩
-          [ Bt ] ^^ l-depth ++ pathʳ (foldT f g Leaf l)
-        ≡⟨ cong₂ _++_ refl (pathʳ-iterByGs l g Leaf eq4 appender2G) ⟩
-          [ Bt ] ^^ l-depth ++ ([ Ct ] ^^ l-depth ++ [])
-        ≡⟨ cong₂ _++_ refl (ListProp.++-identityʳ ([ Ct ] ^^ l-depth)) ⟩
+          pathʳ (foldT A B fl l)
+        ≡⟨ pathʳ-foldT-Gs A B fl l eq4 appender2B ⟩
+          [ Bt ] ^^ l-depth ++ pathʳ fl
+        ≡⟨ cong₂ _++_ refl pathʳ-fl ⟩
           [ Bt ] ^^ l-depth ++ [ Ct ] ^^ l-depth
         ∎
 
       pathʳ-eq6-rhs : pathʳ fl' ≡ pathʳ (foldT (B Leaf) (C Leaf) Leaf t) ^^ l-depth
-      pathʳ-eq6-rhs = _
+      pathʳ-eq6-rhs = begin
+          pathʳ fl'
+        ≡⟨⟩
+          pathʳ (foldT A g' Leaf l)
+        ≡⟨ pathʳ-foldT-Gs A g' Leaf l eq4 (appender2g' t) ⟩
+          pathʳ (foldT (B Leaf) (C Leaf) Leaf t) ^^ l-depth ++ []
+        ≡⟨ ListProp.++-identityʳ _ ⟩
+          pathʳ (foldT (B Leaf) (C Leaf) Leaf t) ^^ l-depth
+        ∎
  
   r-depth-01 : r-depth ≡ 0 ⊎ r-depth ≡ 1
   r-depth-01 = n≤1-is-01 (≯⇒≤ (no-repeats r-depth _ { a = Bt } { b = At } (λ ()) pathʳ-eq8))
 
   l-depth-01 : l-depth ≡ 0 ⊎ l-depth ≡ 1
   l-depth-01 = n≤1-is-01 (≯⇒≤ (no-repeats l-depth _ { a = Bt } { b = Ct } (λ ()) (sym pathʳ-eq6)))
+
+  fgcase→r0 : t ≡ F (G u X) → r ≡ X
+  fgcase→r0 fgProof = pat-F0-G0 r (Data.Sum.[ id , ⊥-elim ∘ r-depth≢1 ] r-depth-01) eq2
+    where
+      pathʳ-t : pathʳ (foldT A B Leaf t) ≡ At ∷ Bt ∷ []
+      pathʳ-t = cong (λ t → pathʳ (foldT A B Leaf t)) fgProof
+      
+      r-depth≢1 : r-depth ≢ 1
+      r-depth≢1 witness = case contradiction of λ ()
+        where
+          contradiction : At ∷ Bt ∷ [] ≡ [ Bt ] ^^ 1 ++ [ At ] ^^ 1 
+          contradiction = begin
+              At ∷ Bt ∷ []
+            ≡˘⟨ cong₂ repeatN witness pathʳ-t ⟩
+              pathʳ (foldT A B Leaf t) ^^ r-depth
+            ≡⟨ pathʳ-eq8 ⟩
+              [ Bt ] ^^ r-depth ++ [ At ] ^^ r-depth
+            ≡⟨ cong (λ n → [ Bt ] ^^ n ++ [ At ] ^^ n) witness ⟩
+              [ Bt ] ^^ 1 ++ [ At ] ^^ 1
+            ∎
+  
+  gfcase→l0 : t ≡ G u (F X) → l ≡ X
+  gfcase→l0 gfProof = pat-F0-G0 l eq4 (Data.Sum.[ id , ⊥-elim ∘ l-depth≢1 ] l-depth-01)
+    where
+      pathʳ-t : pathʳ (foldT (B Leaf) (C Leaf) Leaf t) ≡ Ct ∷ Bt ∷ []
+      pathʳ-t = cong (λ t → pathʳ (foldT (B Leaf) (C Leaf) Leaf t)) gfProof
+      
+      l-depth≢1 : l-depth ≢ 1
+      l-depth≢1 witness = case contradiction of λ ()
+        where
+          contradiction : [ Bt ] ^^ 1 ++ [ Ct ] ^^ 1 ≡ Ct ∷ Bt ∷ []
+          contradiction = begin
+              [ Bt ] ^^ 1 ++ [ Ct ] ^^ 1
+            ≡˘⟨ cong (λ n → [ Bt ] ^^ n ++ [ Ct ] ^^ n ) witness ⟩
+              [ Bt ] ^^ l-depth ++ [ Ct ] ^^ l-depth
+            ≡⟨ pathʳ-eq6 ⟩
+              pathʳ (foldT (B Leaf) (C Leaf) Leaf t) ^^ l-depth
+            ≡⟨ cong₂ repeatN witness pathʳ-t ⟩
+              Ct ∷ Bt ∷ []
+            ∎
 
   gfcase-uniqueness : t ≡ G u (F X) → (def ≡ UsualStateMonad.def)
   gfcase-uniqueness = _
