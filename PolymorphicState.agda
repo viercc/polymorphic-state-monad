@@ -25,118 +25,123 @@ import Relation.Binary.PropositionalEquality as Eq
 open Eq hiding ([_])
 open Eq.≡-Reasoning
 
+----------------------
+
+variable
+  α : Set
+  β : Set
+
+----------------------
+
+-- Type part of the State monad
+State : Set → Set → Set
+State s a = s → (s × a)
+
+-- fmap is unique by the Functor law
+fmap : { s : Set } { a : Set } { b : Set } → (a → b) → State s a → State s b
+fmap f ma s = Product.map₂ f (ma s)
+
+-- pure is unique just by the parametricity
+pure : { s : Set } { a : Set } → a → State s a
+pure a s = s , a
+
+-- Our beloved join defining the usual State monad
+usualJoin : { s : Set } { a : Set } → State s (State s a) -> State s a
+usualJoin mma s0 = case mma s0 of λ {
+    (s1 , ma) → ma s1
+  }
+
+------------------------
+
+-- Type of natural transformations
+-- from (State s)^n to (State s), s universally qunatified.
+-- 
+-- n = 1,2,3 respectively.
+M~>M : Set₁
+M~>M = ∀ {s a : Set} → State s a → State s a
+
+M²~>M : Set₁
+M²~>M = ∀ {s a : Set} → State s (State s a) → State s a
+
+M³~>M : Set₁
+M³~>M = ∀ {s a : Set} → State s (State s (State s a)) → State s a
+
+-- The type M~>M is isomorphic to (ℕ × ℕ). 
+-- (Can't this proven inside Agda?)
+{-
+  ∀{s a} → State s a → State s a
+    =
+  ∀{s a} → (s → s × a) → (s → s × a)
+    ≅
+  ∀{s a} → (s → s) × (s → a) → (s → s × a)
+    ≅
+  ∀{s a} → (s → s) → (s → a) → s → s × a
+    ≅
+  ∀{s a} → (s → s) → s → (s → a) → s × a
+    ≅
+  ∀{s} → (s → s) → s → (∀{a} → (s → a) → s × a)
+    ≅⟨Yoneda lemma⟩
+  ∀{s} →  (s → s) → s → s × s
+    ≅
+  ∀{s} → ((s → s) → s → s) × ((s → s) → s → s)
+    ≅
+  (∀{s} → (s → s) → (s → s)) × (∀{s} → (s → s) → (s → s))
+    ≅⟨ Boehm-Berarducci encoding of ℕ ⟩
+  ℕ × ℕ
+-}
+
+reifyNat¹ : M~>M → (ℕ × ℕ)
+reifyNat¹ nat = nat (λ n → (suc n , n)) zero
+
+iterate : ℕ → (α → α) → α → α
+iterate zero _ x = x
+iterate (suc n) f x = f (iterate n f x)
+
+runNat¹ : (ℕ × ℕ) → M~>M
+runNat¹ (n₁ , n₂) {s = s} {a = a} ma s0 =
+  let f : s → s
+      f = proj₁ ∘ ma
+  in iterate n₁ f s0 , proj₂ (ma (iterate n₂ f s0))
+
+-- -- reifyNat¹ (runNat¹ nn) ≡ nn
+-- -- runNat¹ (reifyNat¹ nat) ma s ≡ nat ma s
+
+-- Similarly, M²~>M ≅ (T × T × T), with T below.
+
 data T : Set where
   F : T -> T
   G : T -> T -> T
   X : T
 
-variable
-  α : Set
-  β : Set
+reifyNat² : M²~>M → T × (T × T)
+reifyNat² nat = nat tt X
+  where
+    tt : State T (State T (T × T))
+    tt t1 = F t1 , λ t2 → (G t1 t2 , (t1 , t2))
 
 foldT : (α → α) → (α → α → α) → α → T → α
 foldT f g x X     = x
 foldT f g x (F t) = f (foldT f g x t)
 foldT f g x (G t1 t2) = g (foldT f g x t1) (foldT f g x t2)
 
-iterate : ℕ → (α → α) → α → α
-iterate zero _ x = x
-iterate (suc n) f x = f (iterate n f x)
-
-countFs : T -> ℕ
-countFs = foldT suc constᵣ zero
-
-countGs : T -> ℕ
-countGs = foldT id (λ { _ r → suc r }) zero
-
-pat-F0-G0 : (t : T) → countFs t ≡ 0 → countGs t ≡ 0 → t ≡ X
-pat-F0-G0 X _ _ = refl
-
-pat-F0-G1 : (t : T) → countFs t ≡ 0 → countGs t ≡ 1 → Σ[ u ∈ T ] (t ≡ G u X)
-pat-F0-G1 (G u X) _ _ = u , refl
-
-pat-F1-G0 : (t : T) → countFs t ≡ 1 → countGs t ≡ 0 → t ≡ F X
-pat-F1-G0 (F X) _ _ = refl
-
-pat-F1-G1 : (t : T)
-  → countFs t ≡ 1
-  → countGs t ≡ 1
-  → Σ[ u ∈ T ] (t ≡ G u (F X) ⊎ t ≡ F (G u X))
-pat-F1-G1 (G u (F X)) _ _ = u , inj₁ refl 
-pat-F1-G1 (F (G u X)) _ _ = u , inj₂ refl
-
-----------------------------
-
-State : Set → Set → Set
-State s a = s → (s × a)
-
-record JoinDef : Set where
-  field
-    t : T
-    l : T
-    r : T
-
-mapState : { s : Set } { a : Set } { b : Set } → (a → b) → State s a → State s b
-mapState f ma s = Product.map₂ f (ma s)
-
-pure : { s : Set } { a : Set } → a → State s a
-pure a s = s , a
-
-runDef : JoinDef → {σ : Set} {α : Set} → State σ (State σ α) → State σ α
-runDef def {σ = st} {α = a} mma s = foldT f g s t , ret (foldT f g s l) (foldT f g s r)
+runNat² : (T × (T × T)) → M²~>M
+runNat² (t , (l , r)) {s = σ} {a = α} mma s = foldT f g s t , ret (foldT f g s l) (foldT f g s r)
   where
-    open JoinDef def
-
-    f : st → st
+    f : σ → σ
     f s1 = proj₁ (mma s1)
 
-    g : st → st → st
+    g : σ → σ → σ
     g s1 s2 = proj₁ (proj₂ (mma s1) s2)
 
-    ret : st → st → a
+    ret : σ → σ → α
     ret s1 s2 = proj₂ (proj₂ (mma s1) s2)
 
-succState : State ℕ ℕ
-succState n = (suc n , n)
+-- -- reifyNat² (runNat² def) ≡ def
+-- -- runNat² (reifyNat² nat) mma s ≡ nat mma s
 
----- Left Unit ----
+---------------------------
 
-LeftUnitProp : JoinDef → Set₁
-LeftUnitProp def = ∀ {σ : Set} {α : Set}
-  → (ma : State σ α) → (s0 : σ)
-  → runDef def (pure ma) s0 ≡ ma s0
-
-record LeftUnitProp' (def : JoinDef) : Set where
-  open JoinDef def
-  field
-    eq1 : countGs t ≡ 1
-    eq2 : countGs r ≡ 0
-
-leftUnitProp-toProp' : (def : JoinDef) → LeftUnitProp def → LeftUnitProp' def
-leftUnitProp-toProp' def H = case ,-injective (H succState 0) of λ
-  { (eq1 , eq2) → record { eq1 = eq1 ; eq2 = eq2 } }
-
--- leftUnitProp'-toProp : (def : JoinDef) → LeftUnitProp' def → LeftUnitProp def
-
----- Right Unit ----
-
-RightUnitProp : JoinDef → Set₁
-RightUnitProp def = ∀ {σ : Set} {α : Set}
-  → (ma : State σ α) → (s0 : σ)
-  → runDef def (mapState pure ma) s0 ≡ ma s0
-
-record RightUnitProp' (def : JoinDef) : Set where
-  open JoinDef def
-  field
-    eq3 : countFs t ≡ 1
-    eq4 : countFs l ≡ 0
-
-rightUnitProp-toProp' : (def : JoinDef) → RightUnitProp def → RightUnitProp' def
-rightUnitProp-toProp' def H = case ,-injective (H succState 0) of λ {
-    (eq3 , eq4) → record { eq3 = eq3 ; eq4 = eq4 }
-  }
-
----- Associativity ----
+-- M³~>M ≅ (S × (S × S × S)), with S below.
 
 data S : Set where
   Leaf : S
@@ -144,27 +149,149 @@ data S : Set where
   B : S -> S -> S
   C : S -> S -> S -> S
 
-sss : State S (State S (State S (S × S × S)))
-sss s1 = A s1 , λ { s2 → B s1 s2 , λ { s3 → C s1 s2 s3 , (s1 , s2 , s3) } }
-
-joinjoin1 : JoinDef → ∀ {σ : Set} → State σ (State σ (State σ α)) → State σ α
-joinjoin1 def {σ = σ} mmma = join (join mmma) 
+reifyNat³ : M³~>M → (S × (S × S × S))
+reifyNat³ nat = nat sss Leaf
   where
-    join : ∀ {β : Set} → State σ (State σ β) → State σ β
-    join = runDef def
+    sss : State S (State S (State S (S × S × S)))
+    sss s1 = A s1 , λ { s2 → B s1 s2 , λ { s3 → C s1 s2 s3 , (s1 , s2 , s3) } }
 
-joinjoin2 : JoinDef → ∀ {σ : Set} → State σ (State σ (State σ α)) → State σ α
-joinjoin2 def {σ = σ} mmma = join (mapState join mmma)
+foldS :  (α → α) → (α → α → α) → (α → α → α → α) → α → S → α
+foldS a b c leaf Leaf = leaf
+foldS a b c leaf (A s) = a (foldS a b c leaf s)
+foldS a b c leaf (B s s₁) = b (foldS a b c leaf s) (foldS a b c leaf s₁)
+foldS a b c leaf (C s s₁ s₂) = c (foldS a b c leaf s) (foldS a b c leaf s₁) (foldS a b c leaf s₂)
+
+runNat³ : (S × (S × S × S)) → M³~>M
+runNat³ (s1 , (s2 , s3 , s4)) {s = σ} {a = α} mmma init
+  = eval s1 , ret (eval s2) (eval s3) (eval s4)
   where
-    join : ∀ {β : Set} → State σ (State σ β) → State σ β
-    join = runDef def
+    a : σ → σ
+    a x = proj₁ (mmma x)
 
-AssocProp : JoinDef → Set₁
-AssocProp def = ∀ {σ : Set} {α : Set}
-  → (mmma : State σ (State σ (State σ α))) → (s0 : σ)
-  → joinjoin1 def mmma s0 ≡ joinjoin2 def mmma s0
+    b : σ → σ → σ
+    b x y = proj₁ (proj₂ (mmma x) y)
+    
+    c : σ → σ → σ → σ
+    c x y z = proj₁ (proj₂ (proj₂ (mmma x) y) z)
 
-module AssocAux (def : JoinDef) where
+    ret : σ → σ → σ → α
+    ret x y z = proj₂ (proj₂ (proj₂ (mmma x) y) z)
+
+    eval : S → σ
+    eval = foldS a b c init
+
+-------------------------------------------------
+
+-- To state about Monad laws, make an alias of (T × T × T),
+-- the data defining join : M²~>M.
+
+record JoinDef : Set where
+  field
+    t : T
+    l : T
+    r : T
+
+Join : Set₁
+Join = M²~>M
+
+runDef : JoinDef → Join
+runDef def = runNat² (JoinDef.t def , (JoinDef.l def , JoinDef.r def))
+
+module UsualStateMonad where
+  join : Join
+  join = usualJoin
+
+  def : JoinDef
+  def = case reifyNat² join of λ {
+      (t , (l , r)) → record { t = t ; l = l ; r = r }
+    }
+  
+  private
+    _ : def ≡ record { t = G X (F X) ; l = X ; r = F X }
+    _ = refl
+
+
+{-
+
+Monad laws can be seen as a equalities between Mⁿ~>M.
+
+  leftUnit  : (join ∘ pure : M~>M) ≗ (id : M~>M)
+  rightUnit : (join ∘ fmap pure : M~>M) ≗ (id : M~>M)
+  assoc     : (join ∘ join : M³~>M) ≗ (join ∘ fmap join : M³~>M)
+
+By runNat¹ and runNat³ being isomorphisms, instead of proving the above, one only need to prove the following.
+
+  leftUnit'  : reifyNat¹ (join ∘ pure) ≡ reifyNat¹ id
+  rightUnit' : reifyNat¹ (join ∘ fmap pure) ≡ reifyNat¹ id
+  assoc'     : reifyNat³ (join ∘ join) ≡ reifyNat³ (join ∘ fmap join)
+
+Furthermore, by runDef being isomorphism, every possible (join : Join) satisfying the above equalities
+is an image of every solution of the following "system of equations" on (def : JoinDef).
+
+  leftUnit''  : leftUnitLHS def ≡ idNatRep
+  rightUnit'' : rightUnitLHS def ≡ idNatRep
+  assoc''     : assocLHS def ≡ assocRHS def
+
+where each functions are
+
+-}
+
+idNatRep : ℕ × ℕ
+idNatRep = reifyNat¹ id
+
+idNatRepValue : idNatRep ≡ (1 , 0)
+idNatRepValue = refl
+
+leftUnitLHS : JoinDef → ℕ × ℕ
+leftUnitLHS def = reifyNat¹ (λ ma → runDef def (pure ma))
+
+rightUnitLHS : JoinDef → ℕ × ℕ
+rightUnitLHS def = reifyNat¹ (λ ma → runDef def (fmap pure ma))
+
+assocLHS : JoinDef → S × (S × S × S)
+assocLHS def = reifyNat³ (λ mmma → runDef def (runDef def mmma))
+
+assocRHS : JoinDef → S × (S × S × S)
+assocRHS def = reifyNat³ (λ mmma → runDef def (fmap (runDef def) mmma))
+
+---------------------------------------
+
+countFs : T -> ℕ
+countFs = foldT suc constᵣ zero
+
+countGs : T -> ℕ
+countGs = foldT id (λ { _ r → suc r }) zero
+
+---- Left and Right unit laws ----
+
+-- By manually evaluating leftUnitLHS and idNatRep:
+record LeftUnitProp' (def : JoinDef) : Set where
+  open JoinDef def
+  field
+    eq1 : countGs t ≡ 1
+    eq2 : countGs r ≡ 0
+
+makeLeftUnitProp' : (def : JoinDef) → leftUnitLHS def ≡ idNatRep → LeftUnitProp' def
+makeLeftUnitProp' def eqs = case ,-injective eqs of λ {
+    (eq1 , eq2) → record { eq1 = eq1 ; eq2 = eq2 }
+  }
+
+-- By manually evaluating rightUnitLHS and idNatRep:
+record RightUnitProp' (def : JoinDef) : Set where
+  open JoinDef def
+  field
+    eq3 : countFs t ≡ 1
+    eq4 : countFs l ≡ 0
+
+makeRightUnitProp' : (def : JoinDef) → rightUnitLHS def ≡ idNatRep → RightUnitProp' def
+makeRightUnitProp' def eqs = case ,-injective eqs of λ {
+    (eq3 , eq4) → record { eq3 = eq3 ; eq4 = eq4 }
+  }
+
+---- Associativity ----
+
+-- By manually evaluating assocLHS and assocRHS:
+record AssocProp' (def : JoinDef) : Set where
   open JoinDef def
 
   f : S → S
@@ -184,42 +311,39 @@ module AssocAux (def : JoinDef) where
   fr' : S
   fr' = foldT A g' Leaf r
 
-record AssocProp' (def : JoinDef) : Set where
-  open JoinDef def
-  open AssocAux def
-
   field
     eq5 : foldT f g Leaf t ≡ foldT A g' Leaf t
     eq6 : foldT A B (foldT f g Leaf l) l ≡ fl'
     eq7 : foldT A B (foldT f g Leaf l) r ≡ foldT (B fl') (C fl') fr' l
     eq8 : foldT f g Leaf r ≡ foldT (B fl') (C fl') fr' r
 
-assocProp-to-Prop' : (def : JoinDef) → AssocProp def → AssocProp' def
-assocProp-to-Prop' def H = record {
-    eq5 = eq5 ;
-    eq6 = eq6 ;
-    eq7 = eq7 ;
-    eq8 = eq8
+makeAssocProp' : (def : JoinDef) → assocLHS def ≡ assocRHS def → AssocProp' def
+makeAssocProp' def eqs = record {
+    eq5 = ,-injective₁ eqs ;
+    eq6 = ,-injective₁ (,-injective₂ eqs) ;
+    eq7 = ,-injective₁ (,-injective₂ (,-injective₂ eqs)) ;
+    eq8 = ,-injective₂ (,-injective₂ (,-injective₂ eqs))
   }
-  
-  where
-    allEqs : joinjoin1 def sss Leaf ≡ joinjoin2 def sss Leaf
-    allEqs = H sss Leaf
-
-    eq5 : _
-    eq5 = ,-injective₁ allEqs
-
-    eq6 : _
-    eq6 = ,-injective₁ (,-injective₂ allEqs)
-
-    eq7 : _
-    eq7 = ,-injective₁ (,-injective₂ (,-injective₂ allEqs))
-
-    eq8 : _
-    eq8 = ,-injective₂ (,-injective₂ (,-injective₂ allEqs))
 
 ------------------------------------
 
+pat-F0-G0 : (t : T) → countFs t ≡ 0 → countGs t ≡ 0 → t ≡ X
+pat-F0-G0 X _ _ = refl
+
+pat-F0-G1 : (t : T) → countFs t ≡ 0 → countGs t ≡ 1 → Σ[ u ∈ T ] (t ≡ G u X)
+pat-F0-G1 (G u X) _ _ = u , refl
+
+pat-F1-G0 : (t : T) → countFs t ≡ 1 → countGs t ≡ 0 → t ≡ F X
+pat-F1-G0 (F X) _ _ = refl
+
+pat-F1-G1 : (t : T)
+  → countFs t ≡ 1
+  → countGs t ≡ 1
+  → Σ[ u ∈ T ] (t ≡ G u (F X) ⊎ t ≡ F (G u X))
+pat-F1-G1 (G u (F X)) _ _ = u , inj₁ refl 
+pat-F1-G1 (F (G u X)) _ _ = u , inj₂ refl
+
+---------------
 
 data STag : Set where
   At : STag
@@ -227,10 +351,7 @@ data STag : Set where
   Ct : STag
 
 pathʳ : S -> List STag
-pathʳ Leaf = []
-pathʳ (A s) = At ∷ pathʳ s
-pathʳ (B _ s) = Bt ∷ pathʳ s
-pathʳ (C _ _ s) = Ct ∷ pathʳ s
+pathʳ = foldS (λ s → At ∷ s) (λ _ s → Bt ∷ s) (λ _ _ s → Ct ∷ s) []
 
 rightAppender1 : (S → S) → Set
 rightAppender1 f = ∀ (x : S) → pathʳ (f x) ≡ pathʳ (f Leaf) ++ pathʳ x
@@ -454,17 +575,9 @@ record MonadProp (def : JoinDef) : Set where
     rightUnitP : RightUnitProp' def
     assocP : AssocProp' def
 
-  open AssocAux def public
   open LeftUnitProp' leftUnitP public
   open RightUnitProp' rightUnitP public
   open AssocProp' assocP public
-
-usualDef : JoinDef
-usualDef = record{
-    t = G X (F X) ;
-    l = X ;
-    r = F X
-  }
 
 module StateMonadUniquenessImpl (def : JoinDef) (props : MonadProp def) where
   open JoinDef def
@@ -535,12 +648,12 @@ module StateMonadUniquenessImpl (def : JoinDef) (props : MonadProp def) where
   l-depth-01 : l-depth ≡ 0 ⊎ l-depth ≡ 1
   l-depth-01 = _
 
-  gfcase-uniqueness : t ≡ G u (F X) → (def ≡ usualDef)
+  gfcase-uniqueness : t ≡ G u (F X) → (def ≡ UsualStateMonad.def)
   gfcase-uniqueness = _
 
   fgcase-impossible : ¬ (t ≡ F (G u X))
   fgcase-impossible = _
 
-  uniqueness : def ≡ usualDef
+  uniqueness : def ≡ UsualStateMonad.def
   uniqueness = Data.Sum.[  gfcase-uniqueness , ⊥-elim ∘ fgcase-impossible ] gf-or-fg
  
