@@ -16,13 +16,14 @@ import Data.Product as Product
 open import Data.Nat
 open import Data.List
 open import Relation.Nullary using (¬_)
-open import Data.Empty using (⊥-elim)
+open import Data.Empty using (⊥; ⊥-elim)
 import Data.List.Properties as ListProp
 import Data.Nat.Properties as NatProp
 open NatProp using (≮⇒≥)
 
 import Relation.Binary.PropositionalEquality as Eq
-open Eq hiding ([_])
+open Eq
+  renaming ([_] to sing)
 open Eq.≡-Reasoning
 
 ----------------------
@@ -139,6 +140,11 @@ runNat² (t , (l , r)) {s = σ} {a = α} mma s = foldT f g s t , ret (foldT f g 
 -- -- reifyNat² (runNat² def) ≡ def
 -- -- runNat² (reifyNat² nat) mma s ≡ nat mma s
 
+caseT : ∀ (t : T) → (Σ[ t₁ ∈ T ] (t ≡ F t₁)) ⊎ (Σ[ t₁ ∈ T ] (Σ[ t₂ ∈ T ] (t ≡ G t₁ t₂))) ⊎ (t ≡ X)
+caseT (F t₁) = inj₁ (t₁ , refl)
+caseT (G t₁ t₂) = inj₂ (inj₁ (t₁ , t₂ , refl))
+caseT X = inj₂ (inj₂ refl)
+
 ---------------------------
 
 -- M³~>M ≅ (S × (S × S × S)), with S below.
@@ -179,6 +185,16 @@ runNat³ (s1 , (s2 , s3 , s4)) {s = σ} {a = α} mmma init
 
     eval : S → σ
     eval = foldS a b c init
+
+module _ where
+  A-injective : ∀{x y : S} → A x ≡ A y → x ≡ y
+  A-injective refl = refl
+
+  B-injective : ∀{x₁ x₂ y₁ y₂ : S} → B x₁ y₁ ≡ B x₂ y₂ → x₁ ≡ x₂ × y₁ ≡ y₂
+  B-injective refl = refl , refl
+
+  C-injective : ∀{x₁ x₂ y₁ y₂ z₁ z₂ : S} → C x₁ y₁ z₁ ≡ C x₂ y₂ z₂ → x₁ ≡ x₂ × y₁ ≡ y₂ × z₁ ≡ z₂
+  C-injective refl = refl , refl , refl
 
 -------------------------------------------------
 
@@ -618,24 +634,16 @@ record MonadProp (def : JoinDef) : Set where
   open RightUnitProp' rightUnitP public
   open AssocProp' assocP public
 
-module StateMonadUniquenessImpl (def : JoinDef) (props : MonadProp def) where
+gf-or-fg : (def : JoinDef) → (props : MonadProp def) →
+  Σ[ u ∈ T ] (JoinDef.t def ≡ G u (F X) ⊎ JoinDef.t def ≡ F (G u X))
+gf-or-fg def props = pat-F1-G1 (JoinDef.t def) (MonadProp.eq3 props) (MonadProp.eq1 props)
+
+module R-01 (def : JoinDef) (props : MonadProp def) where
   open JoinDef def
   open MonadProp props
   
-  gf-or-fg-sum : _
-  gf-or-fg-sum = pat-F1-G1 t eq3 eq1
-
-  u : T
-  u = proj₁ gf-or-fg-sum
-  
-  gf-or-fg : t ≡ G u (F X) ⊎ t ≡ F (G u X)
-  gf-or-fg = proj₂ gf-or-fg-sum
-  
   r-depth : ℕ
   r-depth = countFs r
-
-  l-depth : ℕ
-  l-depth = countGs l
 
   pathʳ-eq8 : pathʳ (foldT A B Leaf t) ^^ r-depth ≡ [ Bt ] ^^ r-depth ++ [ At ] ^^ r-depth
   pathʳ-eq8 = subst₂ _≡_ pathʳ-eq8-lhs pathʳ-eq8-rhs (cong pathʳ eq8)
@@ -685,6 +693,19 @@ module StateMonadUniquenessImpl (def : JoinDef) (props : MonadProp def) where
         ≡⟨ cong (_++_ ([ Bt ] ^^ r-depth)) pathʳ-fr' ⟩
           [ Bt ] ^^ r-depth ++ [ At ] ^^ r-depth
         ∎
+  
+  r-depth-01 : r-depth ≡ 0 ⊎ r-depth ≡ 1
+  r-depth-01 = n≤1-is-01 (≯⇒≤ (no-repeats r-depth _ { a = Bt } { b = At } (λ ()) pathʳ-eq8))
+
+  r-01 : r ≡ X ⊎ r ≡ F X
+  r-01 = Data.Sum.map (λ r0 → pat-F0-G0 r r0 eq2) (λ r1 → pat-F1-G0 r r1 eq2) r-depth-01
+
+module L-01 (def : JoinDef) (props : MonadProp def) where
+  open JoinDef def
+  open MonadProp props
+
+  l-depth : ℕ
+  l-depth = countGs l
 
   pathʳ-eq6 : [ Bt ] ^^ l-depth ++ [ Ct ] ^^ l-depth ≡ pathʳ (foldT (B Leaf) (C Leaf) Leaf t) ^^ l-depth
   pathʳ-eq6 = subst₂ _≡_ pathʳ-eq6-lhs pathʳ-eq6-rhs (cong pathʳ eq6)
@@ -729,58 +750,117 @@ module StateMonadUniquenessImpl (def : JoinDef) (props : MonadProp def) where
           pathʳ (foldT (B Leaf) (C Leaf) Leaf t) ^^ l-depth
         ∎
  
-  r-depth-01 : r-depth ≡ 0 ⊎ r-depth ≡ 1
-  r-depth-01 = n≤1-is-01 (≯⇒≤ (no-repeats r-depth _ { a = Bt } { b = At } (λ ()) pathʳ-eq8))
-
   l-depth-01 : l-depth ≡ 0 ⊎ l-depth ≡ 1
   l-depth-01 = n≤1-is-01 (≯⇒≤ (no-repeats l-depth _ { a = Bt } { b = Ct } (λ ()) (sym pathʳ-eq6)))
 
-  fgcase→r0 : t ≡ F (G u X) → r ≡ X
-  fgcase→r0 fgProof = pat-F0-G0 r (Data.Sum.[ id , ⊥-elim ∘ r-depth≢1 ] r-depth-01) eq2
-    where
-      pathʳ-t : pathʳ (foldT A B Leaf t) ≡ At ∷ Bt ∷ []
-      pathʳ-t = cong (λ t → pathʳ (foldT A B Leaf t)) fgProof
-      
-      r-depth≢1 : r-depth ≢ 1
-      r-depth≢1 witness = case contradiction of λ ()
-        where
-          contradiction : At ∷ Bt ∷ [] ≡ [ Bt ] ^^ 1 ++ [ At ] ^^ 1 
-          contradiction = begin
-              At ∷ Bt ∷ []
-            ≡˘⟨ cong₂ repeatN witness pathʳ-t ⟩
-              pathʳ (foldT A B Leaf t) ^^ r-depth
-            ≡⟨ pathʳ-eq8 ⟩
-              [ Bt ] ^^ r-depth ++ [ At ] ^^ r-depth
-            ≡⟨ cong (λ n → [ Bt ] ^^ n ++ [ At ] ^^ n) witness ⟩
-              [ Bt ] ^^ 1 ++ [ At ] ^^ 1
-            ∎
+  l-01 : (l ≡ X) ⊎ (Σ[ k ∈ T ] (l ≡ G k X))
+  l-01 = Data.Sum.map (pat-F0-G0 l eq4) (pat-F0-G1 l eq4) l-depth-01
+
+gfCaseDef : T → T → T → JoinDef
+gfCaseDef u l r = record { t = G u (F X) ; l = l ; r = r }
+
+module GFCase (u l r : T) (props : MonadProp (gfCaseDef u l r)) where
+  def : JoinDef
+  def = gfCaseDef u l r
+
+  open JoinDef def using (t)
+  open MonadProp props
+  open R-01 def props
+  open L-01 def props
   
-  gfcase→l0 : t ≡ G u (F X) → l ≡ X
-  gfcase→l0 gfProof = pat-F0-G0 l eq4 (Data.Sum.[ id , ⊥-elim ∘ l-depth≢1 ] l-depth-01)
-    where
-      pathʳ-t : pathʳ (foldT (B Leaf) (C Leaf) Leaf t) ≡ Ct ∷ Bt ∷ []
-      pathʳ-t = cong (λ t → pathʳ (foldT (B Leaf) (C Leaf) Leaf t)) gfProof
-      
-      l-depth≢1 : l-depth ≢ 1
-      l-depth≢1 witness = case contradiction of λ ()
-        where
-          contradiction : [ Bt ] ^^ 1 ++ [ Ct ] ^^ 1 ≡ Ct ∷ Bt ∷ []
-          contradiction = begin
-              [ Bt ] ^^ 1 ++ [ Ct ] ^^ 1
-            ≡˘⟨ cong (λ n → [ Bt ] ^^ n ++ [ Ct ] ^^ n ) witness ⟩
-              [ Bt ] ^^ l-depth ++ [ Ct ] ^^ l-depth
-            ≡⟨ pathʳ-eq6 ⟩
-              pathʳ (foldT (B Leaf) (C Leaf) Leaf t) ^^ l-depth
-            ≡⟨ cong₂ repeatN witness pathʳ-t ⟩
-              Ct ∷ Bt ∷ []
-            ∎
+  l≡X : l ≡ X
+  l≡X with l-01          | l-depth | pathʳ-eq6
+  l≡X  | inj₁ eq         | _       | _ = eq
+  l≡X  | inj₂ (_ , refl) | 1       | ()
 
-  gfcase-uniqueness : t ≡ G u (F X) → (def ≡ UsualStateMonad.def)
-  gfcase-uniqueness = _
+  fu : S
+  fu = foldT f g Leaf u
 
-  fgcase-impossible : ¬ (t ≡ F (G u X))
-  fgcase-impossible = _
+  fu' : S
+  fu' = foldT A g' Leaf u
+  
+  eq5-lhs : foldT f g Leaf t ≡ C fu (foldT A B fu r) (B (foldT A B Leaf u) (A Leaf))
+  eq5-lhs with l≡X
+  eq5-lhs  | refl = refl
+
+  eq5-rhs : foldT A g' Leaf t ≡ C fu' (foldT (B fu') (C fu') (A Leaf) u) (B fu' (A Leaf))
+  eq5-rhs = refl
+  
+  eq5' : C fu (foldT A B fu r) (B (foldT A B Leaf u) (A Leaf))
+      ≡ C fu' (foldT (B fu') (C fu') (A Leaf) u) (B fu' (A Leaf))
+  eq5' = trans (sym eq5-lhs) (trans eq5 eq5-rhs)
+
+  eq5-1 : fu ≡ fu'
+  eq5-1 = proj₁ (C-injective eq5')
+
+  eq5-2 : foldT A B fu r ≡ foldT (B fu') (C fu') (A Leaf) u
+  eq5-2 = proj₁ (proj₂ (C-injective eq5'))
+
+  eq5-3 : foldT A B Leaf u ≡ fu'
+  eq5-3 = proj₁ (B-injective (proj₂ (proj₂ (C-injective eq5'))))
 
   uniqueness : def ≡ UsualStateMonad.def
-  uniqueness = Data.Sum.[  gfcase-uniqueness , ⊥-elim ∘ fgcase-impossible ] gf-or-fg
- 
+  uniqueness with l≡X | r-01
+  uniqueness | refl | inj₁ refl = ⊥-elim (inequal-fold u bad-eq)
+    where
+      inequal-fold : (x : T) → foldT A B Leaf x ≢ foldT (B fu') (C fu') (A Leaf) x
+      inequal-fold (F _) ()
+      inequal-fold (G _ _) ()
+      inequal-fold X ()
+
+      bad-eq : foldT A B Leaf u ≡ foldT (B fu') (C fu') (A Leaf) u
+      bad-eq =
+        begin
+          foldT A B Leaf u
+        ≡⟨ eq5-3 ⟩
+          fu'
+        ≡⟨ sym eq5-1 ⟩
+          fu
+        ≡⟨ refl ⟩
+          foldT A B fu r
+        ≡⟨ eq5-2 ⟩
+          foldT (B fu') (C fu') (A Leaf) u
+        ∎
+  uniqueness | refl | inj₂ refl =
+    begin
+      record{ t = G u (F X) ; l = l ; r = r }
+    ≡⟨⟩
+      record{ t = G u (F X) ; l = X ; r = F X }
+    ≡⟨ cong (λ u → record{ t = G u (F X) ; l = X ; r = F X }) u≡X ⟩
+      record{ t = G X (F X) ; l = X ; r = F X }
+    ∎
+    where
+      u≡X : u ≡ X
+      u≡X with caseT u
+      u≡X | inj₁ (u₁ , refl) = case eq5-2 of λ ()
+      u≡X | inj₂ (inj₁ (u₁ , u₂ , refl)) = case eq5-2 of λ ()
+      u≡X | inj₂ (inj₂ eq) = eq
+
+fgCaseDef : T → T → T → JoinDef
+fgCaseDef u l r = record { t = F (G u X) ; l = l ; r = r }
+
+module FGCase (u l r : T) (props : MonadProp (fgCaseDef u l r)) where
+  def : JoinDef
+  def = fgCaseDef u l r
+
+  open JoinDef def using (t)
+  open MonadProp props
+  open R-01 def props
+  open L-01 def props
+
+  r≡X : r ≡ X
+  r≡X with r-01 | r-depth | pathʳ-eq8
+  r≡X  | inj₁ eq   | _ | _ = eq
+  r≡X  | inj₂ refl | 1 | ()
+
+  impossible : ⊥
+  impossible = _
+
+uniqueness : (def : JoinDef) (props : MonadProp def) → def ≡ UsualStateMonad.def
+uniqueness def props with gf-or-fg def props
+uniqueness def props | u , inj₁ refl = GFCaseInst.uniqueness
+  where
+    module GFCaseInst = GFCase u (JoinDef.l def) (JoinDef.r def) props
+uniqueness def props | u , inj₂ refl = ⊥-elim FGCaseInst.impossible
+  where
+    module FGCaseInst = FGCase u (JoinDef.l def) (JoinDef.r def) props
