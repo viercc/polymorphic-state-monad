@@ -26,6 +26,8 @@ open Eq
   renaming ([_] to sing)
 open Eq.≡-Reasoning
 
+open import ListLemma
+
 ----------------------
 
 variable
@@ -93,10 +95,6 @@ M³~>M = ∀ {s a : Set} → State s (State s (State s a)) → State s a
 
 reifyNat¹ : M~>M → (ℕ × ℕ)
 reifyNat¹ nat = nat (λ n → (suc n , n)) zero
-
-iterate : ℕ → (α → α) → α → α
-iterate zero _ x = x
-iterate (suc n) f x = f (iterate n f x)
 
 runNat¹ : (ℕ × ℕ) → M~>M
 runNat¹ (n₁ , n₂) {s = s} {a = a} ma s0 =
@@ -365,173 +363,6 @@ pat-F1-G1 (F (G u X)) _ _ = u , inj₂ refl
 
 ---------------
 
--- Nat properties
-
-n≤1-is-01 : ∀{n : ℕ} → n ≤ 1 → n ≡ 0 ⊎ n ≡ 1
-n≤1-is-01 {n = zero} p = inj₁ refl
-n≤1-is-01 {n = suc n} (s≤s z≤n) = inj₂ refl
-
-≯⇒≤ : ∀{ n m : ℕ } → (n ≯ m) → n ≤ m
-≯⇒≤ = ≮⇒≥
-
--- List properties
-
-repeatN : ℕ → List α → List α
-repeatN n x = iterate n (_++_ x) []
-
-syntax repeatN n x = x ^^ n
-
-length-repeatN : (x : List α) → (n : ℕ) → length (x ^^ n) ≡ n * length x
-length-repeatN x zero = refl
-length-repeatN x (suc n) = begin
-    length (x ^^ suc n)
-  ≡⟨⟩
-    length (x ++ x ^^ n)
-  ≡⟨ ListProp.length-++ x ⟩
-    length x + length (x ^^ n)
-  ≡⟨ cong (_+_ (length x)) (length-repeatN x n) ⟩
-    length x + n * length x
-  ≡⟨⟩
-    suc n * length x
-  ∎
-
-repeat-+ : (x : List α) → (n m : ℕ) → x ^^ n ++ x ^^ m ≡ x ^^ (n + m)
-repeat-+ x zero m = refl
-repeat-+ x (suc n) m = begin
-    (x ^^ suc n) ++ x ^^ m
-  ≡⟨⟩
-    (x ++ x ^^ n) ++ x ^^ m
-  ≡⟨ ListProp.++-assoc x (x ^^ n) (x ^^ m) ⟩
-    x ++ (x ^^ n ++ x ^^ m)
-  ≡⟨ cong₂ _++_ refl (repeat-+ x n m) ⟩
-    x ++ x ^^ (n + m)
-  ≡⟨⟩
-    x ^^ (suc n + m)
-  ∎
-
-repeat-* : (x : List α) → (n m : ℕ) → (x ^^ n) ^^ m ≡ x ^^ (m * n)
-repeat-* x n zero = refl
-repeat-* x n (suc m) = begin
-    (x ^^ n) ^^ (suc m)
-  ≡⟨⟩
-    x ^^ n ++ (x ^^ n) ^^ m
-  ≡⟨ cong₂ _++_ refl (repeat-* x n m) ⟩
-    x ^^ n ++ x ^^ (m * n)
-  ≡⟨ repeat-+ x n (m * n) ⟩
-    x ^^ (n + m * n)
-  ≡⟨ refl ⟩
-    x ^^ (suc m * n)
-  ∎
-
-repeat-*-comm : (x : List α) → (n m : ℕ) → (x ^^ n) ^^ m ≡ (x ^^ m) ^^ n
-repeat-*-comm x n m = begin
-    (x ^^ n) ^^ m
-  ≡⟨ repeat-* x n m ⟩
-    x ^^ (m * n)
-  ≡⟨ cong₂ repeatN (NatProp.*-comm m n) refl ⟩
-    x ^^ (n * m)
-  ≡˘⟨ repeat-* x m n ⟩
-    (x ^^ m) ^^ n
-  ∎
-
-drop-repeat : ( a : α ) → (n : ℕ) → (xs : List α) → drop n ([ a ] ^^ n ++ xs) ≡ xs
-drop-repeat a zero xs = refl
-drop-repeat a (suc n) xs = begin
-    drop (suc n) ([ a ] ^^ suc n ++ xs)
-  ≡⟨ refl ⟩
-    drop (suc n) (a ∷ [ a ] ^^ n ++ xs)
-  ≡⟨ drop-repeat a n xs ⟩
-    xs
-  ∎
-
-repeat-prefix : (n : ℕ) → (xs ys zs : List α) → (a : α) →
-  (xs ++ ys ≡ [ a ] ^^ n ++ zs) → length xs ≤ n → xs ≡ [ a ] ^^ length xs
-repeat-prefix n [] ys zs a eq len≤n = refl
-repeat-prefix (suc n) (x ∷ xs) ys zs a eq (s≤s leq₁) =
-  case ListProp.∷-injective eq of λ {
-    (eq-x , eq-xs) → cong₂ _∷_ eq-x (repeat-prefix n xs ys zs a eq-xs leq₁)
-  }
-
-no-repeats-aux : (n : ℕ) → { a b : α } →
-  a ≢ b →
-  ([ a ]  ^^ suc n) ^^ 2 ≢ [ a ] ^^ suc n ++ [ b ] ^^ suc n
-no-repeats-aux n {a = a} {b = b} a≢b eq = a≢b (ListProp.∷-injectiveˡ an≡bn)
-  where
-    sn : ℕ
-    sn = suc n
-
-    an≡bn : [ a ] ^^ sn ≡ [ b ] ^^ sn
-    an≡bn = begin
-        [ a ] ^^ sn
-      ≡˘⟨ ListProp.++-identityʳ _ ⟩
-        [ a ] ^^ sn ++ []
-      ≡˘⟨ drop-repeat a sn _ ⟩
-        drop sn ([ a ] ^^ sn ++ ([ a ] ^^ sn ++ []))
-      ≡⟨⟩
-        drop sn (([ a ] ^^ sn) ^^ 2)
-      ≡⟨ cong (drop sn) eq ⟩
-        drop sn ([ a ] ^^ sn ++ [ b ] ^^ sn)
-      ≡⟨ drop-repeat a sn _ ⟩
-        [ b ] ^^ sn
-      ∎
-
-no-repeats :
-  (n : ℕ) → (xs : List α) → { a b : α } →
-  (a ≢ b) →
-  (xs ^^ n ≡ [ a ] ^^ n ++ [ b ] ^^ n) →
-  (n ≯ 1)
-no-repeats (suc (suc n₂)) xs {a = a} {b = b} a≢b eqn (s≤s (s≤s le₂)) =
-  no-repeats-aux (suc n₂) a≢b (begin
-      ([ a ] ^^ n) ^^ 2
-    ≡⟨ repeat-*-comm [ a ] n 2 ⟩
-      ([ a ] ^^ 2) ^^ n
-    ≡⟨⟩
-      (a ∷ a ∷ []) ^^ n
-    ≡˘⟨ cong (repeatN n) xs≡aa ⟩
-      xs ^^ n
-    ≡⟨ eqn ⟩
-      [ a ] ^^ n ++ [ b ] ^^ n
-    ∎)
-   where
-     n : ℕ
-     n = suc (suc n₂)
-     
-     m : ℕ
-     m = length xs
-
-     n*m≡n*2 : n * m ≡ n * 2
-     n*m≡n*2 = begin
-        n * m
-      ≡˘⟨ length-repeatN xs n ⟩
-        length (xs ^^ n)
-      ≡⟨ cong length eqn ⟩
-        length ([ a ] ^^ n ++ [ b ] ^^ n)
-      ≡⟨ ListProp.length-++ ([ a ] ^^ n) ⟩
-        length ([ a ] ^^ n) + length ([ b ] ^^ n)
-      ≡⟨ cong₂ _+_ (length-repeatN [ a ] n) (length-repeatN [ b ] n) ⟩
-        n * length [ a ] + n * length [ b ]
-      ≡⟨⟩
-        n * 1 + n * 1
-      ≡˘⟨ NatProp.*-distribˡ-+ n 1 1 ⟩
-        n * 2
-      ∎
-     
-     m≡2 : m ≡ 2
-     m≡2 = NatProp.*-cancelˡ-≡ m 2 n n*m≡n*2
-
-     xs≡aa : xs ≡ a ∷ a ∷ []
-     xs≡aa = begin
-        xs
-      ≡⟨ repeat-prefix n xs _ _ a eqn (respˡ _≤_ (sym m≡2) (s≤s (s≤s le₂))) ⟩
-        [ a ] ^^ m
-      ≡⟨ cong₂ repeatN m≡2 refl ⟩
-        [ a ] ^^ 2
-      ≡⟨⟩
-        a ∷ a ∷ []
-      ∎
-
---------
-
 data STag : Set where
   At : STag
   Bt : STag
@@ -703,7 +534,7 @@ module R-01 (def : JoinDef) (props : MonadProp def) where
   r-01 = Data.Sum.map (λ r0 → pat-F0-G0 r r0 eq2) (λ r1 → pat-F1-G0 r r1 eq2) n-01
     where
       n-01 : n ≡ 0 ⊎ n ≡ 1
-      n-01 = n≤1-is-01 (≯⇒≤ (no-repeats n _ { a = Bt } { b = At } (λ ()) pathʳ-eq8))
+      n-01 = n≯1→0or1 (no-repeats n _ { a = Bt } { b = At } (λ ()) pathʳ-eq8)
 
 -- (eq4) and (eq6) implies
 --   l = X | G k X    (for some k)
@@ -762,7 +593,7 @@ module L-01 (def : JoinDef) (props : MonadProp def) where
   l-01 = Data.Sum.map (pat-F0-G0 l eq4) (pat-F0-G1 l eq4) m-01
     where
       m-01 : m ≡ 0 ⊎ m ≡ 1
-      m-01 = n≤1-is-01 (≯⇒≤ (no-repeats m _ { a = Bt } { b = Ct } (λ ()) (sym pathʳ-eq6)))
+      m-01 = n≯1→0or1 (no-repeats m _ { a = Bt } { b = Ct } (λ ()) (sym pathʳ-eq6))
 
 -- Combining them, the possible JoinDef is one of:
 
@@ -793,22 +624,22 @@ classify def props = result
 
 -- Let's resolve each case!
 
+-- | Simply impossible to satisfy eq6
 case-GF-GX-r : ∀ (u k r : T) (props : MonadProp (record { t = G u (F X) ; l = G k X ; r = r })) → ⊥
-case-GF-GX-r u k r props = case pathʳ-eq6 of λ ()
-  where
-    open L-01 (record { t = G u (F X) ; l = G k X ; r = r }) props
+case-GF-GX-r u k r props = case MonadProp.eq6 props of λ ()
 
+-- | Simply impossible to satisfy eq8
 case-FG-l-FX : ∀(u l : T) → MonadProp (record { t = F (G u X) ; l = l ; r = F X }) → ⊥
-case-FG-l-FX u l props = case pathʳ-eq8 of λ ()
-  where
-    open R-01 (record { t = F (G u X) ; l = l ; r = F X }) props
+case-FG-l-FX u l props = case MonadProp.eq8 props of λ ()
 
+-- | Impossible to satisfy eq5, by pattern matching u
 case-GF-X-X : ∀(u : T) → (props : MonadProp (record { t = G u (F X) ; l = X ; r = X })) → ⊥
-case-GF-X-X u props = inequal-fold u bad-eq
-  where
-    -- open JoinDef (record { t = G u (F X) ; l = X ; r = X })
-    open MonadProp props
+case-GF-X-X u     props with MonadProp.eq5 props
+case-GF-X-X (F _)   props  | ()
+case-GF-X-X (G _ _) props  | ()
+case-GF-X-X X       props  | ()
 
+{-
     fu : S
     fu = foldT f g Leaf u
 
@@ -832,44 +663,16 @@ case-GF-X-X u props = inequal-fold u bad-eq
     inequal-fold (F _) ()
     inequal-fold (G _ _) ()
     inequal-fold X ()
-    
-    bad-eq : foldT A B Leaf u ≡ foldT (B fu') (C fu') (A Leaf) u
-    bad-eq =
-      begin
-        foldT A B Leaf u
-      ≡⟨ eq5-3 ⟩
-        fu'
-      ≡⟨ sym eq5-1 ⟩
-        fu
-      ≡⟨ eq5-2 ⟩
-        foldT (B fu') (C fu') (A Leaf) u
-      ∎
+-}
 
+-- | Only u ≡ X satisfy eq5
 case-GF-X-FX : ∀(u : T) → (props : MonadProp (record { t = G u (F X) ; l = X ; r = F X })) → u ≡ X
-case-GF-X-FX u props = u≡X
-  where
-    -- open JoinDef (record { t = G u (F X) ; l = X ; r = F X })
-    open MonadProp props
+case-GF-X-FX u props with MonadProp.eq5 props
+case-GF-X-FX (F _)   props | ()
+case-GF-X-FX (G _ _) props | ()
+case-GF-X-FX X       props | _ = refl
 
-    fu : S
-    fu = foldT f g Leaf u
-
-    fu' : S
-    fu' = foldT A g' Leaf u
-
-    eq5' : C fu (A fu) (B (foldT A B Leaf u) (A Leaf))
-        ≡ C fu' (foldT (B fu') (C fu') (A Leaf) u) (B fu' (A Leaf))
-    eq5' = eq5
-
-    eq5-2 : A fu ≡ foldT (B fu') (C fu') (A Leaf) u
-    eq5-2 = proj₁ (proj₂ (C-injective eq5'))
-
-    u≡X : u ≡ X
-    u≡X with caseT u
-    u≡X | inj₁ (u₁ , refl) = case eq5-2 of λ ()
-    u≡X | inj₂ (inj₁ (u₁ , u₂ , refl)) = case eq5-2 of λ ()
-    u≡X | inj₂ (inj₂ eq) = eq
-
+-- | Same!
 case-FG-X-X : ∀ (u : T) → (props : MonadProp (record { t = F (G u X) ; l = X ; r = X })) → ⊥
 case-FG-X-X u       props with MonadProp.eq5 props
 case-FG-X-X (F _)   _     | ()
@@ -957,3 +760,22 @@ uniqueness def props = result
     result | def-FG-X-X u = ⊥-elim (case-FG-X-X u props)
     result | def-FG-GX-X u k = ⊥-elim (case-FG-GX-X u k props)
     result | def-FG-l-FX u l = ⊥-elim (case-FG-l-FX u l props)
+
+-- Sanity check: UsualStateMonad.def satisfy MonadProp
+_ : MonadProp (UsualStateMonad.def)
+_ = record {
+  leftUnitP = record {
+    eq1 = refl ;
+    eq2 = refl
+  } ;
+  rightUnitP = record {
+    eq3 = refl ;
+    eq4 = refl
+  } ;
+  assocP = record {
+    eq5 = refl ;
+    eq6 = refl ;
+    eq7 = refl ;
+    eq8 = refl
+  }
+  }
