@@ -1,5 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 module PolymorphicState where
+import Control.Monad (ap)
 
 {-
 
@@ -584,3 +585,38 @@ t = F (G t' X)の場合を「FG型のケース」と呼ぶことにする。
 すなわち通常のStateモナドを定義する3つ組に限る。
 
 -}
+
+-- ちなみに、Reverse state monadというものが一応あるが、これには
+-- 「無限の深さのT」が対応する。
+
+--   https://hackage.haskell.org/package/tardis
+--   https://hackage.haskell.org/package/rev-state
+
+newtype RevState s a = RevState { runRevState :: s -> (a, s) }
+  deriving Functor
+
+instance Applicative (RevState s) where
+  pure a = RevState (\s -> (a, s))
+
+  (<*>) = ap
+
+instance Monad (RevState s) where
+  ma >>= f = RevState $ \s ->
+    let ~(a, s'') = runRevState ma s'
+        ~(b, s')  = runRevState (f a) s
+    in (b, s'')
+
+-- このインスタンスには、以下の無限の深さをもつ T が対応する。
+-- こういった、有限でないTに対しては、foldTが全域関数とはならない。
+-- 
+-- 実際、RevStateの(>>=)は、全域関数でない(m :: s -> (a, s))を返しうる。
+-- 言い換えれば、(>>=)を3引数の関数
+--
+--   (RevState s a, a -> RevState s b, s) -> (b, s)
+--
+-- と見たとき、全域関数になっていない。
+-- このような全域関数でないものは、今回はLawfulなMonadとして認めていない。
+
+revStateDef :: (T, T, T)
+revStateDef = (F t', t', X)
+  where t' = G t' X
