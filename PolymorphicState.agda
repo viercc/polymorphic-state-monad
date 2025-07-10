@@ -378,38 +378,6 @@ rightAppender1 f = ∀ (x : S) → pathʳ (f x) ≡ pathʳ (f Leaf) ++ pathʳ x
 rightAppender2 : (S → S → S) → Set
 rightAppender2 g = ∀ (x y : S) → pathʳ (g x y) ≡ pathʳ (g Leaf Leaf) ++ pathʳ y
 
-pathʳ-foldT : 
-  ∀(f : S → S) (g : S → S → S) (x : S) (t : T)
-  → rightAppender1 f → rightAppender2 g
-  → pathʳ (foldT f g x t) ≡ pathʳ (foldT f g Leaf t) ++ pathʳ x
-pathʳ-foldT f g x (F t) appf appg = begin
-    pathʳ (foldT f g x (F t))
-  ≡⟨ refl ⟩
-    pathʳ (f (foldT f g x t))
-  ≡⟨ appf (foldT f g x t) ⟩
-    pathʳ (f Leaf) ++ pathʳ (foldT f g x t)
-  ≡⟨ cong₂ _++_ refl (pathʳ-foldT f g x t appf appg) ⟩
-    pathʳ (f Leaf) ++ (pathʳ (foldT f g Leaf t) ++ pathʳ x)
-  ≡⟨ sym (ListProp.++-assoc (pathʳ (f Leaf)) (pathʳ (foldT f g Leaf t)) _) ⟩
-    (pathʳ (f Leaf) ++ pathʳ (foldT f g Leaf t)) ++ pathʳ x
-  ≡⟨ cong₂ _++_ (sym (appf (foldT f g Leaf t))) refl ⟩
-    pathʳ (foldT f g Leaf (F t)) ++ pathʳ x
-  ∎
-pathʳ-foldT f g x (G u t) appf appg = begin
-    pathʳ (foldT f g x (G u t))
-  ≡⟨ refl ⟩
-    pathʳ (g (foldT f g x u) (foldT f g x t))
-  ≡⟨ appg _ (foldT f g x t) ⟩
-    pathʳ (g Leaf Leaf) ++ pathʳ (foldT f g x t)
-  ≡⟨ cong₂ _++_ refl (pathʳ-foldT f g x t appf appg) ⟩
-    pathʳ (g Leaf Leaf) ++ (pathʳ (foldT f g Leaf t) ++ pathʳ x)
-  ≡⟨ sym (ListProp.++-assoc (pathʳ (g Leaf Leaf)) (pathʳ (foldT f g Leaf t)) _) ⟩
-    (pathʳ (g Leaf Leaf) ++ pathʳ (foldT f g Leaf t)) ++ pathʳ x
-  ≡⟨ cong₂ _++_ (sym (appg _ (foldT f g Leaf t))) refl ⟩
-    pathʳ (foldT f g Leaf (G u t)) ++ pathʳ x
-  ∎
-pathʳ-foldT f g x X appf appg = refl
-
 pathʳ-foldT-Fs :
   ∀(f : S → S) (g : S → S → S) (x : S) (t : T)
   → countGs t ≡ 0
