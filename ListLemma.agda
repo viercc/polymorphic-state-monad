@@ -26,10 +26,6 @@ private
 
 -- Nat properties
 
-iterate : ℕ → (α → α) → α → α
-iterate zero _ x = x
-iterate (suc n) f x = f (iterate n f x)
-
 n≯1→0or1 : ∀{n : ℕ} → n ≯ 1 → n ≡ 0 ⊎ n ≡ 1
 n≯1→0or1 {n = zero} _ = inj₁ refl
 n≯1→0or1 {n = suc zero} _ = inj₂ refl
@@ -38,7 +34,7 @@ n≯1→0or1 {n = suc (suc n)} n≯1 = ⊥-elim (n≯1 (s≤s NatProp.0<1+n))
 -- List properties
 
 repeatN : ℕ → List α → List α
-repeatN n x = iterate n (_++_ x) []
+repeatN n x = concat (replicate n x)
 
 syntax repeatN n x = x ^^ n
 

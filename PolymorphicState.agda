@@ -96,11 +96,18 @@ M³~>M = ∀ {s a : Set} → State s (State s (State s a)) → State s a
 reifyNat¹ : M~>M → (ℕ × ℕ)
 reifyNat¹ nat = nat (λ n → (suc n , n)) zero
 
+foldℕ : {α : Set} → (α → α) → α → ℕ → α
+foldℕ {α} f x = go
+  where
+    go : ℕ → α
+    go zero = x
+    go (suc n) = f (go n)
+
 runNat¹ : (ℕ × ℕ) → M~>M
 runNat¹ (n₁ , n₂) {s = s} {a = a} ma s0 =
   let f : s → s
       f = proj₁ ∘ ma
-  in iterate n₁ f s0 , proj₂ (ma (iterate n₂ f s0))
+  in foldℕ f s0 n₁ , proj₂ (ma (foldℕ f s0 n₂))
 
 -- -- reifyNat¹ (runNat¹ nn) ≡ nn
 -- -- runNat¹ (reifyNat¹ nat) ma s ≡ nat ma s
@@ -200,6 +207,7 @@ module _ where
 -- the data defining join : M²~>M.
 
 record JoinDef : Set where
+  constructor mkJoin
   field
     t : T
     l : T
@@ -209,21 +217,20 @@ Join : Set₁
 Join = M²~>M
 
 runDef : JoinDef → Join
-runDef def = runNat² (JoinDef.t def , (JoinDef.l def , JoinDef.r def))
+runDef (mkJoin t l r) = runNat² (t , (l , r))
 
 module UsualStateMonad where
   join : Join
   join = usualJoin
 
   def : JoinDef
-  def = case reifyNat² join of λ {
-      (t , (l , r)) → record { t = t ; l = l ; r = r }
-    }
+  def =
+    let t , (l , r) = reifyNat² join 
+    in mkJoin t l r
   
   private
-    _ : def ≡ record { t = G X (F X) ; l = X ; r = F X }
+    _ : def ≡ mkJoin (G X (F X)) X (F X)
     _ = refl
-
 
 {-
 
@@ -276,38 +283,34 @@ countFs = foldT suc constᵣ zero
 countGs : T -> ℕ
 countGs = foldT id (λ { _ r → suc r }) zero
 
----- Left and Right unit laws ----
+---- Monad laws ----
 
--- By manually evaluating leftUnitLHS and idNatRep:
-record LeftUnitProp' (def : JoinDef) : Set where
-  open JoinDef def
+record MonadLaw (def : JoinDef) : Set where
   field
-    eq1 : countGs t ≡ 1
-    eq2 : countGs r ≡ 0
+    leftUnitLaw : leftUnitLHS def ≡ idNatRep
+    rightUnitLaw : rightUnitLHS def ≡ idNatRep
+    assocLaw : assocLHS def ≡ assocRHS def
 
-makeLeftUnitProp' : (def : JoinDef) → leftUnitLHS def ≡ idNatRep → LeftUnitProp' def
-makeLeftUnitProp' def eqs = case ,-injective eqs of λ {
-    (eq1 , eq2) → record { eq1 = eq1 ; eq2 = eq2 }
-  }
-
--- By manually evaluating rightUnitLHS and idNatRep:
-record RightUnitProp' (def : JoinDef) : Set where
+-- MonadLaw can be rewritten as these eq1-eq8
+module ExpandMonadLaw (def : JoinDef) (law : MonadLaw def) where
   open JoinDef def
-  field
-    eq3 : countFs t ≡ 1
-    eq4 : countFs l ≡ 0
+  open MonadLaw law
 
-makeRightUnitProp' : (def : JoinDef) → rightUnitLHS def ≡ idNatRep → RightUnitProp' def
-makeRightUnitProp' def eqs = case ,-injective eqs of λ {
-    (eq3 , eq4) → record { eq3 = eq3 ; eq4 = eq4 }
-  }
+  -- From leftUnitLaw:
+  eq1 : countGs t ≡ 1
+  eq1 = ,-injective₁ leftUnitLaw
 
----- Associativity ----
+  eq2 : countGs r ≡ 0
+  eq2 = ,-injective₂ leftUnitLaw
 
--- By manually evaluating assocLHS and assocRHS:
-record AssocProp' (def : JoinDef) : Set where
-  open JoinDef def
+  -- From rightUnitLaw:
+  eq3 : countFs t ≡ 1
+  eq3 = ,-injective₁ rightUnitLaw
 
+  eq4 : countFs l ≡ 0
+  eq4 = ,-injective₂ rightUnitLaw
+
+  -- From assocLaw:
   f : S → S
   f s1 = foldT A B s1 t
 
@@ -329,19 +332,17 @@ record AssocProp' (def : JoinDef) : Set where
   fr' : S
   fr' = foldT A g' Leaf r
 
-  field
-    eq5 : foldT f g Leaf t ≡ foldT A g' Leaf t
-    eq6 : foldT A B fl l ≡ fl'
-    eq7 : foldT A B fl r ≡ foldT (B fl') (C fl') fr' l
-    eq8 : fr ≡ foldT (B fl') (C fl') fr' r
+  eq5 : foldT f g Leaf t ≡ foldT A g' Leaf t
+  eq5 = ,-injective₁ assocLaw
 
-makeAssocProp' : (def : JoinDef) → assocLHS def ≡ assocRHS def → AssocProp' def
-makeAssocProp' def eqs = record {
-    eq5 = ,-injective₁ eqs ;
-    eq6 = ,-injective₁ (,-injective₂ eqs) ;
-    eq7 = ,-injective₁ (,-injective₂ (,-injective₂ eqs)) ;
-    eq8 = ,-injective₂ (,-injective₂ (,-injective₂ eqs))
-  }
+  eq6 : foldT A B fl l ≡ fl'
+  eq6 = ,-injective₁ (,-injective₂ assocLaw)
+  
+  eq7 : foldT A B fl r ≡ foldT (B fl') (C fl') fr' l
+  eq7 = ,-injective₁ (,-injective₂ (,-injective₂ assocLaw))
+
+  eq8 : fr ≡ foldT (B fl') (C fl') fr' r
+  eq8 = ,-injective₂ (,-injective₂ (,-injective₂ assocLaw))
 
 ------------------------------------
 
@@ -455,35 +456,24 @@ pathʳ-foldT-Gs f g x X noFs appender = refl
 
 ------------------------------------
 
-record MonadProp (def : JoinDef) : Set where
-  field
-    leftUnitP : LeftUnitProp' def
-    rightUnitP : RightUnitProp' def
-    assocP : AssocProp' def
-
-  open LeftUnitProp' leftUnitP public
-  open RightUnitProp' rightUnitP public
-  open AssocProp' assocP public
-
--- (eq1) and (eq3) implies
---   t = G u (F X) | F (G u X)    (for some u)
-gf-or-fg : (def : JoinDef) → (props : MonadProp def) →
-  Σ[ u ∈ T ] (JoinDef.t def ≡ G u (F X) ⊎ JoinDef.t def ≡ F (G u X))
-gf-or-fg def props = pat-F1-G1 (JoinDef.t def) (MonadProp.eq3 props) (MonadProp.eq1 props)
-
--- (eq2) and (eq8) implies
---   r = X | F X
-module R-01 (def : JoinDef) (props : MonadProp def) where
+module Law-consequences (def : JoinDef) (law : MonadLaw def) where
   open JoinDef def
-  open MonadProp props
-  
-  -- r = F^n X
-  n : ℕ
-  n = countFs r
+  open ExpandMonadLaw def law
 
-  pathʳ-eq8 : pathʳ (foldT A B Leaf t) ^^ n ≡ [ Bt ] ^^ n ++ [ At ] ^^ n
-  pathʳ-eq8 = subst₂ _≡_ pathʳ-eq8-lhs pathʳ-eq8-rhs (cong pathʳ eq8)
-    where
+  -- (eq1) and (eq3) implies
+  --   t = G u (F X) | F (G u X)    (for some u)
+  gf-or-fg : 
+    Σ[ u ∈ T ] (t ≡ G u (F X) ⊎ t ≡ F (G u X))
+  gf-or-fg = pat-F1-G1 t eq3 eq1
+
+  -- (eq2) and (eq8) implies
+  --   r = X | F X
+  module R-01 where
+    -- r = F^n X
+    n : ℕ
+    n = countFs r
+
+    private
       appenderA : rightAppender1 A
       appenderA x = refl
 
@@ -529,26 +519,24 @@ module R-01 (def : JoinDef) (props : MonadProp def) where
         ≡⟨ cong (_++_ ([ Bt ] ^^ n)) pathʳ-fr' ⟩
           [ Bt ] ^^ n ++ [ At ] ^^ n
         ∎
-  
-  r-01 : r ≡ X ⊎ r ≡ F X
-  r-01 = Data.Sum.map (λ r0 → pat-F0-G0 r r0 eq2) (λ r1 → pat-F1-G0 r r1 eq2) n-01
-    where
-      n-01 : n ≡ 0 ⊎ n ≡ 1
-      n-01 = n≯1→0or1 (no-repeats n _ { a = Bt } { b = At } (λ ()) pathʳ-eq8)
+      
+      pathʳ-eq8 : pathʳ (foldT A B Leaf t) ^^ n ≡ [ Bt ] ^^ n ++ [ At ] ^^ n
+      pathʳ-eq8 = subst₂ _≡_ pathʳ-eq8-lhs pathʳ-eq8-rhs (cong pathʳ eq8)
+    
+    r-01 : r ≡ X ⊎ r ≡ F X
+    r-01 = Data.Sum.map (λ r0 → pat-F0-G0 r r0 eq2) (λ r1 → pat-F1-G0 r r1 eq2) n-01
+      where
+        n-01 : n ≡ 0 ⊎ n ≡ 1
+        n-01 = n≯1→0or1 (no-repeats n _ { a = Bt } { b = At } (λ ()) pathʳ-eq8)
 
--- (eq4) and (eq6) implies
---   l = X | G k X    (for some k)
-module L-01 (def : JoinDef) (props : MonadProp def) where
-  open JoinDef def
-  open MonadProp props
+  -- (eq4) and (eq6) implies
+  --   l = X | G k X    (for some k)
+  module L-01 where
+    -- l = (G _)^m X
+    m : ℕ
+    m = countGs l
 
-  -- l = (G _)^m X
-  m : ℕ
-  m = countGs l
-
-  pathʳ-eq6 : [ Bt ] ^^ m ++ [ Ct ] ^^ m ≡ pathʳ (foldT (B Leaf) (C Leaf) Leaf t) ^^ m
-  pathʳ-eq6 = subst₂ _≡_ pathʳ-eq6-lhs pathʳ-eq6-rhs (cong pathʳ eq6)
-    where
+    private
       appender2B : rightAppender2 B
       appender2B x y = refl
 
@@ -588,194 +576,122 @@ module L-01 (def : JoinDef) (props : MonadProp def) where
         ≡⟨ ListProp.++-identityʳ _ ⟩
           pathʳ (foldT (B Leaf) (C Leaf) Leaf t) ^^ m
         ∎
- 
-  l-01 : (l ≡ X) ⊎ (Σ[ k ∈ T ] (l ≡ G k X))
-  l-01 = Data.Sum.map (pat-F0-G0 l eq4) (pat-F0-G1 l eq4) m-01
+      
+      pathʳ-eq6 : [ Bt ] ^^ m ++ [ Ct ] ^^ m ≡ pathʳ (foldT (B Leaf) (C Leaf) Leaf t) ^^ m
+      pathʳ-eq6 = subst₂ _≡_ pathʳ-eq6-lhs pathʳ-eq6-rhs (cong pathʳ eq6)
+  
+    l-01 : (l ≡ X) ⊎ (Σ[ k ∈ T ] (l ≡ G k X))
+    l-01 = Data.Sum.map (pat-F0-G0 l eq4) (pat-F0-G1 l eq4) m-01
+      where
+        m-01 : m ≡ 0 ⊎ m ≡ 1
+        m-01 = n≯1→0or1 (no-repeats m _ { a = Bt } { b = Ct } (λ ()) (sym pathʳ-eq6))
+
+  -- Combining them, the possible JoinDef is one of:
+
+  data JoinDefCase : Set where
+    def-GF-X-X : (u : T) → def ≡ mkJoin (G u (F X)) X X → JoinDefCase
+    def-GF-X-FX : (u : T) → def ≡ mkJoin (G u (F X)) X (F X) → JoinDefCase
+    def-GF-GX-r : (u k r : T) → def ≡ mkJoin (G u (F X)) (G k X) r → JoinDefCase
+    def-FG-X-X : (u : T) → def ≡ mkJoin (F (G u X)) X X → JoinDefCase
+    def-FG-GX-X : (u k : T) → def ≡ mkJoin (F (G u X)) (G k X) X → JoinDefCase
+    def-FG-l-FX : (u l : T) → def ≡ mkJoin (F (G u X)) l (F X) → JoinDefCase
+
+  cases : JoinDefCase
+  cases with gf-or-fg    | L-01.l-01       | R-01.r-01
+  ...    | u , inj₁ refl | inj₁ refl       | inj₁ refl = def-GF-X-X u refl
+  ...    | u , inj₁ refl | inj₁ refl       | inj₂ refl = def-GF-X-FX u refl
+  ...    | u , inj₁ refl | inj₂ (k , refl) | _         = def-GF-GX-r u k r refl
+  ...    | u , inj₂ refl | inj₁ refl       | inj₁ refl = def-FG-X-X u refl
+  ...    | u , inj₂ refl | inj₂ (k , refl) | inj₁ refl = def-FG-GX-X u k refl
+  ...    | u , inj₂ refl | _               | inj₂ refl = def-FG-l-FX u l refl
+
+  case-FG-GX-X : ∀(u k : T) → def ≡ mkJoin (F (G u X)) (G k X) X → ⊥
+  case-FG-GX-X u k refl = contradiction
     where
-      m-01 : m ≡ 0 ⊎ m ≡ 1
-      m-01 = n≯1→0or1 (no-repeats m _ { a = Bt } { b = Ct } (λ ()) (sym pathʳ-eq6))
+      depth : S → ℕ
+      depth = foldS suc (λ x _ → suc x) (λ x _ _ → suc x) zero
 
--- Combining them, the possible JoinDef is one of:
+      depth-foldT-AB : ∀ (s : S) (t : T) →
+        depth (foldT A B s t) ≡ depth (foldT A B Leaf t) + depth s
+      depth-foldT-AB s (F t) = cong suc (depth-foldT-AB s t)
+      depth-foldT-AB s (G t t₁) = cong suc (depth-foldT-AB s t)
+      depth-foldT-AB s X = refl
 
-data JoinDefCase : JoinDef → Set where
-  def-GF-X-X : (u : T) → JoinDefCase (record { t = G u (F X) ; l = X ; r = X })
-  def-GF-X-FX : (u : T) → JoinDefCase (record { t = G u (F X) ; l = X ; r = F X })
-  def-GF-GX-r : (u k r : T) → JoinDefCase (record { t = G u (F X) ; l = G k X ; r = r })
-  def-FG-X-X : (u : T) → JoinDefCase (record { t = F (G u X) ; l = X ; r = X })
-  def-FG-GX-X : (u k : T) → JoinDefCase (record { t = F (G u X) ; l = G k X ; r = X })
-  def-FG-l-FX : (u l : T) → JoinDefCase (record { t = F (G u X) ; l = l ; r = F X })
+      fk : S
+      fk = foldT f g Leaf k
 
-classify : (def : JoinDef) → (props : MonadProp def) → JoinDefCase def
-classify def props = result
-  where
-    gffg : Σ[ u ∈ T ] (JoinDef.t def ≡ G u (F X) ⊎ JoinDef.t def ≡ F (G u X))
-    gffg = gf-or-fg def props
-    open L-01 def props using (l-01)
-    open R-01 def props using (r-01)
+      fk' : S
+      fk' = foldT A g' Leaf k
+      
+      _ : fl' ≡ B fk' (C fk' (foldT (B fk') (C fk') Leaf u) Leaf)
+      _ = refl
 
-    result : JoinDefCase def
-    result with gffg        | l-01           | r-01
-    result  | u , inj₁ refl | inj₁ refl       | inj₁ refl = def-GF-X-X u
-    result  | u , inj₁ refl | inj₁ refl       | inj₂ refl = def-GF-X-FX u
-    result  | u , inj₁ refl | inj₂ (k , refl) | _         = def-GF-GX-r u k (JoinDef.r def)
-    result  | u , inj₂ refl | inj₁ refl       | inj₁ refl = def-FG-X-X u
-    result  | u , inj₂ refl | inj₂ (k , refl) | inj₁ refl = def-FG-GX-X u k
-    result  | u , inj₂ refl | _               | inj₂ refl = def-FG-l-FX u (JoinDef.l def)
+      eq7' : C (B (foldT A B fk k) fk) fk Leaf ≡
+              C fl' (foldT (B fl') (C fl') Leaf k) Leaf
+      eq7' = eq7
 
--- Let's resolve each case!
+      eq7-1 : B (foldT A B fk k) fk ≡ fl'
+      eq7-1 = proj₁ (C-injective eq7')
 
--- | Simply impossible to satisfy eq6
-case-GF-GX-r : ∀ (u k r : T) (props : MonadProp (record { t = G u (F X) ; l = G k X ; r = r })) → ⊥
-case-GF-GX-r u k r props = case MonadProp.eq6 props of λ ()
+      eq7-2 : fk ≡ foldT (B fl') (C fl') Leaf k
+      eq7-2 = proj₁ (proj₂ (C-injective eq7'))
 
--- | Simply impossible to satisfy eq8
-case-FG-l-FX : ∀(u l : T) → MonadProp (record { t = F (G u X) ; l = l ; r = F X }) → ⊥
-case-FG-l-FX u l props = case MonadProp.eq8 props of λ ()
+      eq7-1-depth : 1 + depth (foldT A B Leaf k) + depth fk ≡ 1 + depth fk'
+      eq7-1-depth =
+        begin
+          1 + depth (foldT A B Leaf k) + depth fk
+        ≡˘⟨ cong suc (depth-foldT-AB fk k)⟩
+          1 + depth (foldT A B fk k)
+        ≡⟨ cong depth eq7-1 ⟩
+          1 + depth fk'
+        ∎
+      
+      depth-fk≤fk' : depth fk ≤ depth fk'
+      depth-fk≤fk' =
+        subst (depth fk ≤_)
+              (NatProp.suc-injective eq7-1-depth)
+              (NatProp.m≤n+m (depth fk) (depth (foldT A B Leaf k)))
+      
+      eq7-2-depth : depth fk ≡ depth (foldT (B fl') (C fl') Leaf k)
+      eq7-2-depth = cong depth eq7-2
+      
+      2+n>n : ∀ (n : ℕ) → suc (suc n) > n
+      2+n>n _ = NatProp.m≤n⇒m≤1+n NatProp.≤-refl
+      -- suc (suc n) > n = suc n ≥ n = n ≤ suc n
 
--- | Impossible to satisfy eq5, by pattern matching u
-case-GF-X-X : ∀(u : T) → (props : MonadProp (record { t = G u (F X) ; l = X ; r = X })) → ⊥
-case-GF-X-X u     props with MonadProp.eq5 props
-case-GF-X-X (F _)   props  | ()
-case-GF-X-X (G _ _) props  | ()
-case-GF-X-X X       props  | ()
+      m≡2+n⇒m>n : ∀(m n : ℕ) → m ≡ 2 + n → m > n
+      m≡2+n⇒m>n m n refl = 2+n>n n
 
-{-
-    fu : S
-    fu = foldT f g Leaf u
+      contradiction : ⊥
+      contradiction with caseT k       | eq7-2-depth
+      contradiction  | inj₁ (_ , refl) | depth-fk≡2+fk' =
+        NatProp.≤⇒≯ depth-fk≤fk' (m≡2+n⇒m>n (depth fk) (depth fk') depth-fk≡2+fk')
+      contradiction  | inj₂ (inj₁ (_ , _ , refl)) | depth-fk≡2+fk' =
+        NatProp.≤⇒≯ depth-fk≤fk' (m≡2+n⇒m>n (depth fk) (depth fk') depth-fk≡2+fk')
+      contradiction  | inj₂ (inj₂ refl) | _ = case eq7-1 of λ ()
 
-    fu' : S
-    fu' = foldT A g' Leaf u
-
-    eq5' : C fu fu (B (foldT A B Leaf u) (A Leaf))
-        ≡ C fu' (foldT (B fu') (C fu') (A Leaf) u) (B fu' (A Leaf))
-    eq5' = eq5
-
-    eq5-1 : fu ≡ fu'
-    eq5-1 = proj₁ (C-injective eq5')
-
-    eq5-2 : fu ≡ foldT (B fu') (C fu') (A Leaf) u
-    eq5-2 = proj₁ (proj₂ (C-injective eq5'))
-
-    eq5-3 : foldT A B Leaf u ≡ fu'
-    eq5-3 = proj₁ (B-injective (proj₂ (proj₂ (C-injective eq5'))))
-
-    inequal-fold : (x : T) → foldT A B Leaf x ≢ foldT (B fu') (C fu') (A Leaf) x
-    inequal-fold (F _) ()
-    inequal-fold (G _ _) ()
-    inequal-fold X ()
--}
-
--- | Only u ≡ X satisfy eq5
-case-GF-X-FX : ∀(u : T) → (props : MonadProp (record { t = G u (F X) ; l = X ; r = F X })) → u ≡ X
-case-GF-X-FX u props with MonadProp.eq5 props
-case-GF-X-FX (F _)   props | ()
-case-GF-X-FX (G _ _) props | ()
-case-GF-X-FX X       props | _ = refl
-
--- | Same!
-case-FG-X-X : ∀ (u : T) → (props : MonadProp (record { t = F (G u X) ; l = X ; r = X })) → ⊥
-case-FG-X-X u       props with MonadProp.eq5 props
-case-FG-X-X (F _)   _     | ()
-case-FG-X-X (G _ _) _     | ()
-case-FG-X-X X       _     | ()
-
-case-FG-GX-X : ∀(u k : T) → MonadProp (record { t = F (G u X) ; l = G k X ; r = X }) → ⊥
-case-FG-GX-X u k props = contradiction
-  where
-    def : JoinDef
-    def = record { t = F (G u X) ; l = G k X ; r = X }
-
-    open MonadProp props
-
-    depth : S → ℕ
-    depth = foldS suc (λ x _ → suc x) (λ x _ _ → suc x) zero
-
-    depth-foldT-AB : ∀ (s : S) (t : T) →
-      depth (foldT A B s t) ≡ depth (foldT A B Leaf t) + depth s
-    depth-foldT-AB s (F t) = cong suc (depth-foldT-AB s t)
-    depth-foldT-AB s (G t t₁) = cong suc (depth-foldT-AB s t)
-    depth-foldT-AB s X = refl
-
-    fk : S
-    fk = foldT f g Leaf k
-
-    fk' : S
-    fk' = foldT A g' Leaf k
-    
-    _ : fl' ≡ B fk' (C fk' (foldT (B fk') (C fk') Leaf u) Leaf)
-    _ = refl
-
-    eq7' : C (B (foldT A B fk k) fk) fk Leaf ≡
-            C fl' (foldT (B fl') (C fl') Leaf k) Leaf
-    eq7' = eq7
-
-    eq7-1 : B (foldT A B fk k) fk ≡ fl'
-    eq7-1 = proj₁ (C-injective eq7')
-
-    eq7-2 : fk ≡ foldT (B fl') (C fl') Leaf k
-    eq7-2 = proj₁ (proj₂ (C-injective eq7'))
-
-    eq7-1-depth : 1 + depth (foldT A B Leaf k) + depth fk ≡ 1 + depth fk'
-    eq7-1-depth =
-      begin
-        1 + depth (foldT A B Leaf k) + depth fk
-      ≡˘⟨ cong suc (depth-foldT-AB fk k)⟩
-        1 + depth (foldT A B fk k)
-      ≡⟨ cong depth eq7-1 ⟩
-        1 + depth fk'
-      ∎
-    
-    depth-fk≤fk' : depth fk ≤ depth fk'
-    depth-fk≤fk' =
-      subst (depth fk ≤_)
-            (NatProp.suc-injective eq7-1-depth)
-            (NatProp.m≤n+m (depth fk) (depth (foldT A B Leaf k)))
-    
-    eq7-2-depth : depth fk ≡ depth (foldT (B fl') (C fl') Leaf k)
-    eq7-2-depth = cong depth eq7-2
-    
-    2+n>n : ∀ (n : ℕ) → suc (suc n) > n
-    2+n>n _ = NatProp.m≤n⇒m≤1+n NatProp.≤-refl
-    -- suc (suc n) > n = suc n ≥ n = n ≤ suc n
-
-    m≡2+n⇒m>n : ∀(m n : ℕ) → m ≡ 2 + n → m > n
-    m≡2+n⇒m>n m n refl = 2+n>n n
-
-    contradiction : ⊥
-    contradiction with caseT k       | eq7-2-depth
-    contradiction  | inj₁ (_ , refl) | depth-fk≡2+fk' =
-      NatProp.≤⇒≯ depth-fk≤fk' (m≡2+n⇒m>n (depth fk) (depth fk') depth-fk≡2+fk')
-    contradiction  | inj₂ (inj₁ (_ , _ , refl)) | depth-fk≡2+fk' =
-      NatProp.≤⇒≯ depth-fk≤fk' (m≡2+n⇒m>n (depth fk) (depth fk') depth-fk≡2+fk')
-    contradiction  | inj₂ (inj₂ refl) | _ = case eq7-1 of λ ()
-
-uniqueness : (def : JoinDef) (props : MonadProp def) → def ≡ UsualStateMonad.def
-uniqueness def props = result
-  where
-    result : def ≡ UsualStateMonad.def
-    result with classify def props
-    result | def-GF-X-X u = ⊥-elim (case-GF-X-X u props)
-    result | def-GF-X-FX u = cong (λ u → record { t = G u (F X) ; l = X ; r = F X }) (case-GF-X-FX u props)
-    result | def-GF-GX-r u k r = ⊥-elim (case-GF-GX-r u k r props)
-    result | def-FG-X-X u = ⊥-elim (case-FG-X-X u props)
-    result | def-FG-GX-X u k = ⊥-elim (case-FG-GX-X u k props)
-    result | def-FG-l-FX u l = ⊥-elim (case-FG-l-FX u l props)
+  uniqueness : def ≡ mkJoin (G X (F X)) X (F X)
+  uniqueness with cases
+  uniqueness  | def-GF-X-X u refl with u   | eq5
+  ...                              | X     | ()
+  ...                              | F _   | ()
+  ...                              | G _ _ | ()
+  uniqueness  | def-GF-X-FX u refl with u     | eq5
+  ...                               |   X     | _  = refl
+  ...                               |   F _   | () 
+  ...                               |   G _ _ | ()
+  uniqueness  | def-GF-GX-r u k r refl = case eq6 of λ ()
+  uniqueness  | def-FG-X-X u refl with u   | eq5
+  ...                              | X     | ()
+  ...                              | F _   | ()
+  ...                              | G _ _ | ()
+  uniqueness  | def-FG-GX-X u k eq   = ⊥-elim (case-FG-GX-X u k eq)
+  uniqueness  | def-FG-l-FX u l refl = case eq8 of λ ()
 
 -- Sanity check: UsualStateMonad.def satisfy MonadProp
-_ : MonadProp (UsualStateMonad.def)
+_ : MonadLaw UsualStateMonad.def
 _ = record {
-  leftUnitP = record {
-    eq1 = refl ;
-    eq2 = refl
-  } ;
-  rightUnitP = record {
-    eq3 = refl ;
-    eq4 = refl
-  } ;
-  assocP = record {
-    eq5 = refl ;
-    eq6 = refl ;
-    eq7 = refl ;
-    eq8 = refl
-  }
+    leftUnitLaw = refl;
+    rightUnitLaw = refl;
+    assocLaw = refl
   }
