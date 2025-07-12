@@ -30,8 +30,6 @@ open Eq
   renaming ([_] to sing)
 open Eq.≡-Reasoning
 
-open import ListLemma
-
 ----------------------
 
 variable
