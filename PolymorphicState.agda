@@ -191,14 +191,27 @@ runNat³ (s1 , (s2 , s3 , s4)) {s = σ} {a = α} mmma init
     eval = foldS a b c init
 
 module _ where
+  private
+    variable
+      x₁ x₂ y₁ y₂ z₁ z₂ : S
+  
   A-injective : ∀{x y : S} → A x ≡ A y → x ≡ y
   A-injective refl = refl
 
-  B-injective : ∀{x₁ x₂ y₁ y₂ : S} → B x₁ y₁ ≡ B x₂ y₂ → x₁ ≡ x₂ × y₁ ≡ y₂
-  B-injective refl = refl , refl
+  B-injective₁ : B x₁ y₁ ≡ B x₂ y₂ → x₁ ≡ x₂
+  B-injective₁ refl = refl
 
-  C-injective : ∀{x₁ x₂ y₁ y₂ z₁ z₂ : S} → C x₁ y₁ z₁ ≡ C x₂ y₂ z₂ → x₁ ≡ x₂ × y₁ ≡ y₂ × z₁ ≡ z₂
-  C-injective refl = refl , refl , refl
+  B-injective₂ : B x₁ y₁ ≡ B x₂ y₂ → y₁ ≡ y₂
+  B-injective₂ refl = refl
+
+  C-injective₁ : C x₁ y₁ z₁ ≡ C x₂ y₂ z₂ → x₁ ≡ x₂
+  C-injective₁ refl = refl
+
+  C-injective₂ : C x₁ y₁ z₁ ≡ C x₂ y₂ z₂ → y₁ ≡ y₂
+  C-injective₂ refl = refl
+  
+  C-injective₃ : C x₁ y₁ z₁ ≡ C x₂ y₂ z₂ → z₁ ≡ z₂
+  C-injective₃ refl = refl
 
 -------------------------------------------------
 
@@ -274,16 +287,6 @@ assocLHS def = reifyNat³ (λ mmma → runDef def (runDef def mmma))
 assocRHS : JoinDef → S × (S × S × S)
 assocRHS def = reifyNat³ (λ mmma → runDef def (fmap (runDef def) mmma))
 
----------------------------------------
-
-countFs : T -> ℕ
-countFs = foldT suc constᵣ zero
-
-countGs : T -> ℕ
-countGs = foldT id (λ { _ r → suc r }) zero
-
----- Monad laws ----
-
 record MonadLaw (def : JoinDef) : Set where
   field
     leftUnitLaw : leftUnitLHS def ≡ idNatRep
@@ -301,6 +304,11 @@ _ = record {
 ------------------------------------
 
 private
+  countFs : T -> ℕ
+  countFs = foldT suc constᵣ zero
+
+  countGs : T -> ℕ
+  countGs = foldT id (λ { _ r → suc r }) zero
 
   -- MonadLaw can be rewritten as these eq1-eq8
   module ExpandMonadLaw {def : JoinDef} (law : MonadLaw def) where
@@ -582,13 +590,13 @@ private
         _ = refl
 
         eq7-1 : B (runAB k fk) fk ≡ fl'
-        eq7-1 = proj₁ (C-injective eq7)
+        eq7-1 = C-injective₁ eq7
 
         eq7-1-1 : runAB k fk ≡ fk'
-        eq7-1-1 = proj₁ (B-injective eq7-1)
+        eq7-1-1 = B-injective₁ eq7-1
         
         eq7-1-2 : fk ≡ C fk' (runBC u fk' Leaf) Leaf
-        eq7-1-2 = proj₂ (B-injective eq7-1)
+        eq7-1-2 = B-injective₂ eq7-1
 
         infinite-depth : depth fk ≡ 1 + depthT k + depth fk
         infinite-depth =
