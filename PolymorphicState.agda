@@ -5,12 +5,12 @@ module PolymorphicState where
 open import Function
   using (
     _∘_; id; const; constᵣ;
-    case_of_; case_returning_of_
+    case_of_
   )
 open import Data.Sum using (_⊎_; inj₁; inj₂)
-open import Data.Product using (∃; Σ-syntax; _×_; _,_; proj₁; proj₂)
+open import Data.Product using (∃; _×_; _,_; proj₁; proj₂)
 open import Data.Product.Properties
-  using (,-injective)
+  using ()
   renaming (
     ,-injectiveˡ to ,-injective₁;
     ,-injectiveʳ to ,-injective₂
@@ -18,16 +18,12 @@ open import Data.Product.Properties
 import Data.Product as Product
 
 open import Data.Nat
-open import Data.List
 open import Relation.Nullary using (¬_)
 open import Data.Empty using (⊥; ⊥-elim)
-import Data.List.Properties as ListProp
 import Data.Nat.Properties as NatProp
-open NatProp using (≮⇒≥)
 
 import Relation.Binary.PropositionalEquality as Eq
 open Eq
-  renaming ([_] to sing)
 open Eq.≡-Reasoning
 
 ----------------------
