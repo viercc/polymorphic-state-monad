@@ -17,7 +17,7 @@ open import Data.Maybe as Maybe
 
 open import ExtensionalityUtil
 
-module HaskellType (irr-ext : IrrExtensionality 1ℓ 2ℓ) where
+module Indexed.HaskellType (irr-ext : IrrExtensionality 1ℓ 2ℓ) where
 
 private
   .ext₁₂ : Extensionality 1ℓ 2ℓ
@@ -32,9 +32,9 @@ private
   .ext₀₁ : Extensionality 0ℓ 1ℓ
   ext₀₁ = lower-extensionality 1ℓ 2ℓ ext₁₂
 
-import MultiProfunctor
+import Indexed.Profunctor
 
-open MultiProfunctor [ ext₁₁ ]
+open Indexed.Profunctor [ ext₁₁ ]
   renaming (_+_ to _+P_; _×_ to _×P_)
 
 data Ty (V : Set) : Set where
@@ -90,7 +90,7 @@ interpret-mapTy f t env with t
         ∎
         where open ≡-Reasoning
 
-interpretP : ∀ {V : Set} → Ty V → Profunctor {V}
+interpretP : ∀ {V : Set} → Ty V → Profunctor V
 interpretP (varTy v) = var v
 interpretP emptyTy = constant ⊥
 interpretP unitTy = constant ⊤

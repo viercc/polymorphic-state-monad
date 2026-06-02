@@ -19,7 +19,9 @@ open import Relation.Binary.PropositionalEquality as ≡
 
 open import ExtensionalityUtil
 
-module MultiProfunctor (irr-ext : IrrExtensionality 1ℓ 1ℓ) where
+-- | Profunctors between (I → Set) and itself,
+--   their morphisms and isomorphism.
+module Indexed.Profunctor (irr-ext : IrrExtensionality 1ℓ 1ℓ) where
 
 private
   .ext₁₁ : Extensionality 1ℓ 1ℓ
@@ -59,7 +61,7 @@ on-just-nothing-commute f h = λ { nothing  → ≡.refl; (just _) → ≡.refl 
 
 -- * Profunctor type
 
-record Profunctor {I : Set} : Set₂ where
+record Profunctor (I : Set) : Set₂ where
   field
     Carrier : (I → Set) → (I → Set) → Set₁
   
@@ -82,14 +84,14 @@ record Profunctor {I : Set} : Set₂ where
   rmap : ∀ {a b b′} → (b ~> b′) → P a b → P a b′
   rmap g = dimap idᵢ g
 
-Carrier-syntax : ∀ {I} → Profunctor {I} → (I → Set) → (I → Set) → Set₁
+Carrier-syntax : ∀ {I} → Profunctor I → (I → Set) → (I → Set) → Set₁
 Carrier-syntax = Profunctor.Carrier
 
 syntax Carrier-syntax P a b = P [ a , b ]
 
 -- * Instances
 
-hom : ∀ {I} → Profunctor {I}
+hom : ∀ {I} → Profunctor I
 hom = record {
     Carrier = λ a b → Lift 1ℓ (∀ i → a i → b i);
     dimap = λ f g (lift p) → lift (g ∘ᵢ p ∘ᵢ f);
@@ -98,7 +100,7 @@ hom = record {
   }
 
 -- constant profunctor
-constant : ∀ {I} → (c : Set) → Profunctor {I}
+constant : ∀ {I} → (c : Set) → Profunctor I
 constant c = record {
     Carrier = λ _ _ → Lift 1ℓ c;
     dimap = λ _ _ p → p;
@@ -107,7 +109,7 @@ constant c = record {
   }
 
 -- Remap index set by a function (F : I → J)
-_⋆_ : {I J : Set} (F : I → J) (P : Profunctor {I}) → Profunctor {J}
+_⋆_ : {I J : Set} (F : I → J) (P : Profunctor I) → Profunctor J
 _⋆_ {I} {J} F P = record {
     Carrier = λ a b → P [ a ∘ F , b ∘ F ];
     dimap = λ f g → dimap (f ∘ F) (g ∘ F);
@@ -133,7 +135,7 @@ module _ where
     map+-∘ _ _ _ _ (Sum.inj₁ _) = ≡.refl
     map+-∘ _ _ _ _ (Sum.inj₂ _) = ≡.refl
 
-  _+_ : ∀ {I} → Profunctor {I} → Profunctor {I} → Profunctor {I}
+  _+_ : ∀ {I} → Profunctor I → Profunctor I → Profunctor I
   _+_ {I} P Q =
     record {
       Carrier = λ a b → P [ a , b ] ⊎ Q [ a , b ];
@@ -168,7 +170,7 @@ module _ where
       → A Prod.× B → C Prod.× D
     map× f g = Prod.map f g
 
-  _×_ : ∀ {I} → Profunctor {I} → Profunctor {I} → Profunctor {I}
+  _×_ : ∀ {I} → Profunctor I → Profunctor I → Profunctor I
   _×_ {I} P Q =
     record {
       Carrier = λ a b → P [ a , b ] Prod.× Q [ a , b ];
@@ -201,7 +203,7 @@ module _ where
     dimap-fun : ∀ {A B C D : Set₁} → (B → A) → (C → D) → (A → C) → (B → D)
     dimap-fun pre post f = post ∘′ f ∘′ pre
 
-  fun : ∀{I} → Profunctor {I} → Profunctor {I} → Profunctor {I}
+  fun : ∀{I} → Profunctor I → Profunctor I → Profunctor I
   fun {I} P Q = record {
       Carrier = λ a b → P [ b , a ] → Q [ a , b ];
       dimap = λ f g → dimap-fun (dimap P g f) (dimap Q f g);
@@ -228,7 +230,7 @@ module _ where
       open Profunctor
       open ≡.≡-Reasoning
 
-var : ∀ {I} → I → Profunctor {I}
+var : ∀ {I} → I → Profunctor I
 var i = record {
     Carrier = λ _ b → Lift 1ℓ (b i);
     dimap = λ _ g p → lift (g i (lower p)) ;
@@ -236,19 +238,19 @@ var i = record {
     dimap-∘ = λ _ _ _ _ → ≡.refl
   }
 
-v0 : ∀ {I} → Profunctor {Maybe I}
+v0 : ∀ {I} → Profunctor (Maybe I)
 v0 = var nothing
 
-k : ∀ {I} → Profunctor {I} → Profunctor {Maybe I}
+k : ∀ {I} → Profunctor I → Profunctor (Maybe I)
 k = just ⋆_
 
-phantom : {P : Profunctor {⊥}}
+phantom : {P : Profunctor ⊥}
   → ∀ {a b c d} → P [ a , b ] → P [ c , d ]
 phantom {P = P} = Profunctor.dimap P (λ ()) (λ ())
 
 -- * Morphism and isomorphism
 
-record NaturalTransformation {I : Set} (P Q : Profunctor {I}) : Set₁ where
+record NaturalTransformation {I : Set} (P Q : Profunctor I) : Set₁ where
   open Profunctor P renaming (dimap to dimapP)
   open Profunctor Q renaming (dimap to dimapQ)
 
@@ -269,13 +271,13 @@ open NaturalTransformation
 infix 7 NaturalTransformation
 syntax NaturalTransformation a b = a ⇒ b
 
-idNat : {I : Set} {P : Profunctor {I}} → P ⇒ P
+idNat : {I : Set} {P : Profunctor I} → P ⇒ P
 idNat = record {
     φ = id;
     naturality = λ _ _ _ → ≡.refl
   }
 
-_∘Nat_ : {I : Set} {P Q R : Profunctor {I}} → Q ⇒ R → P ⇒ Q → P ⇒ R
+_∘Nat_ : {I : Set} {P Q R : Profunctor I} → Q ⇒ R → P ⇒ Q → P ⇒ R
 _∘Nat_ qr pq = record {
     φ = φ qr ∘ φ pq;
     naturality = λ f g x →
@@ -284,7 +286,7 @@ _∘Nat_ qr pq = record {
         (naturality qr f g (φ pq x))
   } 
 
-record NaturalIso {I : Set} (P Q : Profunctor {I}) : Set₁ where
+record NaturalIso {I : Set} (P Q : Profunctor I) : Set₁ where
   field
     to : P ⇒ Q
     from : Q ⇒ P
@@ -293,7 +295,7 @@ record NaturalIso {I : Set} (P Q : Profunctor {I}) : Set₁ where
 
 syntax NaturalIso P Q = P ⇔ Q
 
-module _ {I : Set} (P : Profunctor {Maybe I}) where
+module _ {I : Set} (P : Profunctor (Maybe I)) where
   open Profunctor P
 
   record End (a b : I → Set) : Set₁ where
@@ -375,7 +377,7 @@ module _ {I : Set} (P : Profunctor {Maybe I}) where
           → on-just {x = y} (f ∘ᵢ g) ≡ on-just f ∘ᵢ on-just g
         on-just-∘ f g = ext₀₀ λ { (just _) → ≡.refl; nothing → ≡.refl } 
   
-  EndP : Profunctor {I}
+  EndP : Profunctor I
   EndP .Carrier = End
   EndP .dimap = dimapEnd
   EndP .dimap-id = dimapEnd-id
@@ -397,7 +399,7 @@ module example where
   module parametricity-id {I : Set} where
     -- Profunctor (a₀ → b₀)
     -- (ignores other type variables)
-    fun₀ : Profunctor {Maybe I}
+    fun₀ : Profunctor (Maybe I)
     fun₀ = fun v0 v0
 
     open Profunctor fun₀
