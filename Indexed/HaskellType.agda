@@ -54,6 +54,8 @@ mapTy f (prodTy t u) = prodTy (mapTy f t) (mapTy f u)
 mapTy f (funTy t u) = funTy (mapTy f t) (mapTy f u)
 mapTy f (forallTy body) = forallTy (mapTy (Maybe.map f) body)
 
+-- TODO: mapTy-id, mapTy-∘
+
 -- * Proof of isomorphisms
 
 -- TODO: Fill TyIsoAxiom
