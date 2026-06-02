@@ -32,10 +32,9 @@ private
   .ext₀₁ : Extensionality 0ℓ 1ℓ
   ext₀₁ = lower-extensionality 1ℓ 2ℓ ext₁₂
 
-import Indexed.Profunctor
-
-open Indexed.Profunctor [ ext₁₁ ]
+open import Indexed.Profunctor [ ext₁₁ ]
   renaming (_+_ to _+P_; _×_ to _×P_)
+open import Indexed.Profunctor.End [ ext₁₁ ]
 
 data Ty (V : Set) : Set where
   varTy : V → Ty V
@@ -54,6 +53,27 @@ mapTy f (sumTy t u) = sumTy (mapTy f t) (mapTy f u)
 mapTy f (prodTy t u) = prodTy (mapTy f t) (mapTy f u)
 mapTy f (funTy t u) = funTy (mapTy f t) (mapTy f u)
 mapTy f (forallTy body) = forallTy (mapTy (Maybe.map f) body)
+
+-- * Proof of isomorphisms
+
+-- TODO: Fill TyIsoAxiom
+
+data TyIsoAxiom {V : Set} : Ty V → Ty V → Set where
+  sum-empty : (t : Ty V) → TyIsoAxiom (sumTy t emptyTy) t
+  sum-comm : (t u : Ty V) → TyIsoAxiom (sumTy t u) (sumTy u t)
+  sum-assoc : (t u v : Ty V) → TyIsoAxiom (sumTy (sumTy t u) v) (sumTy t (sumTy u v))
+  -- etc.
+
+data TyIso {V : Set} : Ty V → Ty V → Set where
+  isoAxiom : ∀ {t u} → TyIsoAxiom t u → TyIso t u
+  isoRefl : ∀ {t} → TyIso t t
+  isoSym : ∀ {t u} → TyIso t u → TyIso u t
+  isoTrans : ∀ {t u v} → TyIso t u → TyIso u v → TyIso t v
+
+weaken : ∀ {V W} (f : W → V) {u v} → TyIso u v → TyIsoAxiom (mapTy f u) (mapTy f v)
+weaken = _
+
+-- * Interpreting
 
 interpret : ∀ {V : Set} → Ty V → (V → Set) → Set₁
 interpret (varTy v)       var = Lift (suc 0ℓ) (var v)
@@ -98,3 +118,5 @@ interpretP (sumTy t u) = interpretP t +P interpretP u
 interpretP (prodTy t u) = interpretP t ×P interpretP u
 interpretP (funTy t u) = fun (interpretP t) (interpretP u)
 interpretP (forallTy body) = EndP (interpretP body)
+
+-- TODO: interpret TyIso to isomorphism between Profunctors
