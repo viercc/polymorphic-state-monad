@@ -5,9 +5,9 @@ open import Level
 open import Relation.Binary.PropositionalEquality
 
 open import Function
-  using (_∘_; id)
+  using (_∘_; id; _$_)
 
-open import Data.Product as Prod using (_×_; _,_)
+open import Data.Product as Prod using (_×_)
 open import Data.Sum as Sum using (_⊎_)
 open import Data.Unit
 open import Data.Empty
@@ -15,7 +15,27 @@ open import Data.Empty
 open import Data.Maybe as Maybe
   using (Maybe; nothing; just; maybe; maybe′)
 
-module HaskellType where
+open import ExtensionalityUtil
+
+module HaskellType (irr-ext : IrrExtensionality 1ℓ 2ℓ) where
+
+private
+  .ext₁₂ : Extensionality 1ℓ 2ℓ
+  ext₁₂ = irrelevant irr-ext
+
+  .ext₁₁ : Extensionality 1ℓ 1ℓ
+  ext₁₁ = lower-extensionality 1ℓ 2ℓ ext₁₂
+
+  .ext₀₀ : Extensionality 0ℓ 0ℓ
+  ext₀₀ = lower-extensionality 1ℓ 2ℓ ext₁₂
+
+  .ext₀₁ : Extensionality 0ℓ 1ℓ
+  ext₀₁ = lower-extensionality 1ℓ 2ℓ ext₁₂
+
+import MultiProfunctor
+
+open MultiProfunctor [ ext₁₁ ]
+  renaming (_+_ to _+P_; _×_ to _×P_)
 
 data Ty (V : Set) : Set where
   varTy : V → Ty V
@@ -45,24 +65,36 @@ interpret (funTy t u)     var = interpret t var → interpret u var
 interpret (forallTy body) var =
   (A : Set) → interpret body (maybe′ var A)
 
-interpret-mapTy : ∀ {V W : Set} (f : V → W) (t : Ty V) (env : W → Set)
+.interpret-mapTy : ∀ {V W : Set} (f : V → W) (t : Ty V) (env : W → Set)
   → interpret (mapTy f t) env ≡ interpret t (env ∘ f)
 interpret-mapTy f t env with t
-... | (varTy v) = refl 
+... | varTy v = refl
 ... | emptyTy = refl
 ... | unitTy = refl
 ... | sumTy u₁ u₂ = cong₂ _⊎_ (interpret-mapTy f u₁ env) (interpret-mapTy f u₂ env)
 ... | prodTy u₁ u₂ = cong₂ _×_ (interpret-mapTy f u₁ env) (interpret-mapTy f u₂ env)
 ... | funTy u₁ u₂ = cong₂ (λ A B → A → B) (interpret-mapTy f u₁ env) (interpret-mapTy f u₂ env)
-... | forallTy body = {! !} -- requires funext?
-
-{-
-
-TODO:
+... | forallTy body =
+  cong (λ (T : Set → Set₁) → (A : Set) → T A)
+    (ext₁₂ bodySetEq)
+    where
+      bodySetEq : (A : Set) →
+        interpret (mapTy (Maybe.map f) body) (maybe′ env A) ≡
+        interpret body (maybe′ (env ∘ f) A)
+      bodySetEq A = begin
+          interpret (mapTy (Maybe.map f) body) (maybe′ env A)
+        ≡⟨ interpret-mapTy (Maybe.map f) body (maybe′ env A) ⟩
+          interpret body (maybe′ env A ∘ Maybe.map f)
+        ≡⟨ cong (interpret body) (ext₀₁ (λ { (just _) → refl ; nothing → refl })) ⟩
+          interpret body (maybe′ (env ∘ f) A)
+        ∎
+        where open ≡-Reasoning
 
 interpretP : ∀ {V : Set} → Ty V → Profunctor {V}
-
-interpretP-Carrier : ∀ {V} (t : Ty V) (env : V → Set)
-  → interpretP t .Carrier env env ≡ interpret t env
-
--}
+interpretP (varTy v) = var v
+interpretP emptyTy = constant ⊥
+interpretP unitTy = constant ⊤
+interpretP (sumTy t u) = interpretP t +P interpretP u
+interpretP (prodTy t u) = interpretP t ×P interpretP u
+interpretP (funTy t u) = fun (interpretP t) (interpretP u)
+interpretP (forallTy body) = EndP (interpretP body)

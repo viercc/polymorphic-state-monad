@@ -14,10 +14,6 @@ open import Data.Empty
 
 open import Data.Maybe using (Maybe; nothing; just; maybe; maybe′)
 
-open import Data.Irrelevant
-
-import Axiom.Extensionality.Propositional as Ext
-
 open import Relation.Binary.PropositionalEquality as ≡
    using (_≡_)
 
@@ -25,11 +21,12 @@ open import ExtensionalityUtil
 
 module MultiProfunctor (irr-ext : IrrExtensionality 1ℓ 1ℓ) where
 
-.ext₁₁ : Ext.Extensionality 1ℓ 1ℓ
-ext₁₁ = irrelevant irr-ext
+private
+  .ext₁₁ : Extensionality 1ℓ 1ℓ
+  ext₁₁ = irrelevant irr-ext
 
-.ext₀₀ : Ext.Extensionality 0ℓ 0ℓ
-ext₀₀ = Ext.lower-extensionality 1ℓ 1ℓ ext₁₁
+  .ext₀₀ : Extensionality 0ℓ 0ℓ
+  ext₀₀ = lower-extensionality 1ℓ 1ℓ ext₁₁
 
 -- * Preliminary definitions
 
@@ -47,9 +44,18 @@ _∘ᵢ_ : ∀ {I : Set} {a b c : I → Set} →
   (f : b ~> c) → (g : a ~> b) → a ~> c 
 _∘ᵢ_ f g i = f i ∘′ g i
 
-last : ∀ {I : Set} {a : I → Set} {x x′ : Set}
+on-just : ∀ {I : Set} {a b : I → Set} {x : Set}
+  → (a ~> b) → maybe′ a x ~> maybe′ b x
+on-just f = maybe f id
+
+on-nothing : ∀ {I : Set} {a : I → Set} {x x′ : Set}
   → (x → x′) → maybe′ a x ~> maybe′ a x′
-last h = maybe (λ _ → id) h
+on-nothing h = maybe (λ _ → id) h
+
+on-just-nothing-commute : ∀ {I : Set} {a b : I → Set} {x x′ : Set}
+  → (f : a ~> b) (h : x → x′)
+  → ∀ mi → (on-just f ∘ᵢ on-nothing h) mi ≡ (on-nothing h ∘ᵢ on-just f) mi
+on-just-nothing-commute f h = λ { nothing  → ≡.refl; (just _) → ≡.refl }
 
 -- * Profunctor type
 
@@ -222,45 +228,19 @@ module _ where
       open Profunctor
       open ≡.≡-Reasoning
 
-var : ∀ {I} → Profunctor {Maybe I}
-var {I} = record {
-    Carrier = λ _ b → Lift 1ℓ (b nothing);
-    dimap = λ _ g p → lift (g nothing (lower p)) ;
+var : ∀ {I} → I → Profunctor {I}
+var i = record {
+    Carrier = λ _ b → Lift 1ℓ (b i);
+    dimap = λ _ g p → lift (g i (lower p)) ;
     dimap-id = ≡.refl ;
     dimap-∘ = λ _ _ _ _ → ≡.refl
   }
 
+v0 : ∀ {I} → Profunctor {Maybe I}
+v0 = var nothing
+
 k : ∀ {I} → Profunctor {I} → Profunctor {Maybe I}
 k = just ⋆_
-
--- * Conversion between simple (single-variable) Profunctor
-
-{-
-module _ where
-  open import Profunctor as P₁
-    using ()
-    renaming (Profunctor to Profunctor₁)
-  
-  point : Profunctor₁ 1ℓ → Profunctor {⊤}
-  point P = record {
-      Carrier = λ a b → PP.Carrier (a tt) (b tt);
-      dimap = λ f g → PP.dimap (f tt) (g tt);
-      dimap-id = dimap-id;
-      dimap-∘ = λ f₁ g₁ f₂ g₂ → PP.dimap-∘ (f₁ tt) (g₁ tt) (f₂ tt) (g₂ tt)
-    }
-    where
-      module PP = Profunctor₁ P
-
-  delta : ∀ {I} → Profunctor {I} → Profunctor₁ 1ℓ
-  delta P = record {
-      Carrier = λ a b → P [ const a , const b ];
-      dimap = λ f g → PP.dimap (const f) (const g);
-      dimap-id = PP.dimap-id;
-      dimap-∘ = λ f₁ g₁ f₂ g₂ → PP.dimap-∘ (const f₁) (const g₁) (const f₂) (const g₂)
-    }
-    where
-      module PP = Profunctor P
--}
 
 phantom : {P : Profunctor {⊥}}
   → ∀ {a b c d} → P [ a , b ] → P [ c , d ]
@@ -314,31 +294,97 @@ record NaturalIso {I : Set} (P Q : Profunctor {I}) : Set₁ where
 syntax NaturalIso P Q = P ⇔ Q
 
 module _ {I : Set} (P : Profunctor {Maybe I}) where
-  open Profunctor P using (lmap; rmap)
+  open Profunctor P
 
   record End (a b : I → Set) : Set₁ where
+    constructor mkEnd
     
     field
       proj : ∀ (x : Set) → P [ maybe′ a x , maybe′ b x ]
     
     Extranaturality : Set₁
     Extranaturality = ∀ {x⁻ x⁺} → (h : x⁻ → x⁺)
-        → lmap (last h) (proj x⁺) ≡ rmap (last h) (proj x⁻)
+        → lmap (on-nothing h) (proj x⁺) ≡ rmap (on-nothing h) (proj x⁻)
     
     field
       .extranaturality : Extranaturality
 
-open End
+  open End public
 
-congEnd : ∀ {I : Set} {P : Profunctor {Maybe I}} {a b : I → Set} {p p′ : End P a b}
-  → proj p ≡ proj p′
-  → p ≡ p′
-congEnd ≡.refl = ≡.refl
+  .extEnd : ∀ {a b : I → Set} {p₁ p₂ : End a b}
+    → (∀ (x : Set) → p₁ .proj x ≡ p₂ .proj x)
+    → p₁ ≡ p₂
+  extEnd {p₁ = p₁} {p₂ = p₂} projEq with ext₁₁ projEq
+  ... | ≡.refl = ≡.refl
+
+  dimapEnd : ∀ {a a′ b b′ : I → Set} → (a′ ~> a) → (b ~> b′) → End a b → End a′ b′
+  dimapEnd f g (mkEnd p _) .proj x = dimap (on-just f) (on-just g) (p x)
+  dimapEnd f g (mkEnd p exnatP) .extranaturality {x⁻} {x⁺} h =
+    begin
+      lmap (on-nothing h) (dimap (on-just f) (on-just g) (p x⁺))
+    ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p x⁺) ⟨
+      dimap (on-just f ∘ᵢ on-nothing h) (on-just g) (p x⁺)
+    ≡⟨ ≡.cong (λ fh → dimap fh (on-just g) (p x⁺)) (ext₀₀ $ on-just-nothing-commute f h) ⟩
+      dimap (on-nothing h ∘ᵢ on-just f) (on-just g) (p x⁺)
+    ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p x⁺) ⟩
+      dimap (on-just f) (on-just g) (lmap (on-nothing h) (p x⁺))
+    ≡⟨ ≡.cong (dimap _ _) (exnatP h) ⟩
+      dimap (on-just f) (on-just g) (rmap (on-nothing h) (p x⁻))
+    ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p x⁻) ⟨
+      dimap (on-just f) (on-just g ∘ᵢ on-nothing h) (p x⁻)
+    ≡⟨ ≡.cong (λ gh → dimap (on-just f) gh (p x⁻)) (ext₀₀ $ on-just-nothing-commute g h) ⟩
+      dimap (on-just f) (on-nothing h ∘ᵢ on-just g) (p x⁻)
+    ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p x⁻) ⟩
+      rmap (on-nothing h) (dimap (on-just f) (on-just g) (p x⁻))
+    ∎
+    where
+      open ≡.≡-Reasoning
+
+  .dimapEnd-id : ∀ {a b}
+    → dimapEnd {a = a} {b = b} idᵢ idᵢ ≡ id
+  dimapEnd-id = ext₁₁ λ p → extEnd λ x →
+    begin
+      dimap (on-just idᵢ) (on-just idᵢ) (p .proj x)
+    ≡⟨ ≡.cong₂ (λ f g → dimap f g (p .proj x)) on-just-id on-just-id ⟩
+      dimap idᵢ idᵢ (p .proj x)
+    ≡⟨ ≡.cong-app dimap-id (p .proj x) ⟩
+      p .proj x
+    ∎
+    where
+      open ≡.≡-Reasoning
+      
+      on-just-id : ∀ {c} {y} → on-just {x = y} (idᵢ {a = c}) ≡ idᵢ
+      on-just-id = ext₀₀ λ { (just _) → ≡.refl; nothing → ≡.refl } 
+  
+  .dimapEnd-∘ : ∀ {a a′ a″ b b′ b″}
+    → (f₁ : a″ ~> a′) (g₁ : b′ ~> b″) (f₂ : a′ ~> a) (g₂ : b ~> b′)
+    → dimapEnd (f₂ ∘ᵢ f₁) (g₁ ∘ᵢ g₂) ≡ dimapEnd f₁ g₁ ∘′ dimapEnd f₂ g₂
+  dimapEnd-∘ f₁ g₁ f₂ g₂ = ext₁₁ λ p → extEnd λ x →
+      begin
+        dimap (on-just (f₂ ∘ᵢ f₁)) (on-just (g₁ ∘ᵢ g₂)) (p .proj x)
+      ≡⟨ ≡.cong₂ (λ f g → dimap f g (p .proj x)) (on-just-∘ _ _) (on-just-∘ _ _) ⟩
+        dimap (on-just f₂ ∘ᵢ on-just f₁) (on-just g₁ ∘ᵢ on-just g₂) (p .proj x)
+      ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p .proj x) ⟩
+        dimap (on-just f₁) (on-just g₁) (dimap (on-just f₂) (on-just g₂) (p .proj x))
+      ∎
+      where
+        open ≡.≡-Reasoning
+        
+        on-just-∘ : ∀ {a₁ a₂ a₃} {y}
+          → (f : a₂ ~> a₃) (g : a₁ ~> a₂)
+          → on-just {x = y} (f ∘ᵢ g) ≡ on-just f ∘ᵢ on-just g
+        on-just-∘ f g = ext₀₀ λ { (just _) → ≡.refl; nothing → ≡.refl } 
+  
+  EndP : Profunctor {I}
+  EndP .Carrier = End
+  EndP .dimap = dimapEnd
+  EndP .dimap-id = dimapEnd-id
+  EndP .dimap-∘ = dimapEnd-∘
 
 module example where
 
   module profunctor-construction where
-    _ : Profunctor.Carrier (fun (var {⊥} × fun var var) var)
+    _ : Profunctor.Carrier (fun (v0 {⊥} × fun v0 v0) v0)
           ≡
         (λ a b →
           let
@@ -348,54 +394,55 @@ module example where
         )
     _ = ≡.refl
   
-  module parametricity-id where
-    open Profunctor (hom {Maybe ⊥})
+  module parametricity-id {I : Set} where
+    -- Profunctor (a₀ → b₀)
+    -- (ignores other type variables)
+    fun₀ : Profunctor {Maybe I}
+    fun₀ = fun v0 v0
 
-    -- End' = single-variable End
-    End' : Profunctor {Maybe ⊥} → Set₁
-    End' P = End P ⊥-elim ⊥-elim
+    open Profunctor fun₀
 
-    idEnd' : End' hom
-    idEnd' = record {
-        proj = λ a → lift (idᵢ {a = maybe′ ⊥-elim a});
+    idEnd : ∀ {a* b*} → End fun₀ a* b*
+    idEnd = record {
+        proj = λ _ → id;
         extranaturality = λ _ → ≡.refl
       }
     
     private
-      pick-nothing : ∀ {I} {a b : Maybe I → Set}
-        → hom [ a , b ] → a nothing → b nothing
-      pick-nothing p = lower p nothing
+      _ : ∀ {a b : Maybe I → Set}
+        → fun₀ [ a , b ] ≡ (Lift 1ℓ (a nothing) → Lift 1ℓ (b nothing))
+      _ = ≡.refl
 
-      .pick-nothing-injective :
-          ∀ {a b : Maybe ⊥ → Set}
-        → {p q : hom [ a , b ]}
-        → pick-nothing p ≡ pick-nothing q
-        → p ≡ q
-      pick-nothing-injective {p = p} {q = q} hyp = ≡.cong lift $ ext₀₀ $ λ {
-          (just bot) → ⊥-elim bot;
-          nothing → hyp
-        }
+      const-on-nothing : ∀ {a₀ b₀ : Set} (x₀ : b₀) {r : I → Set}
+        → (dummy : Lift 1ℓ a₀)
+        → lift {ℓ = 1ℓ} x₀ ≡ lift {ℓ = 1ℓ} (on-nothing {a = r} (λ (_ : a₀) → x₀) nothing (lower dummy))
+      const-on-nothing _ _ = ≡.refl
 
-      .End-hom-contr : (α : End' hom) → α ≡ idEnd'
-      End-hom-contr α = congEnd $
-        ext₁₁ λ a → pick-nothing-injective {a = maybe ⊥-elim a} {b = maybe ⊥-elim a} $ ext₀₀ λ x →
-          begin
-            lower (proj α a) nothing x
-          ≡⟨⟩
-            (lower (proj α a) nothing ∘ const x) tt
-          ≡⟨⟩
-            ((lower (proj α a) ∘ᵢ last (const x)) nothing) tt
-          ≡⟨⟩
-            lower (lmap (last (const x)) (proj α a)) nothing tt 
-          ≡⟨ ≡.cong (λ p → lower p nothing tt) (extranaturality α (const x)) ⟩
-            lower (rmap (last (const x)) (proj α ⊤)) nothing tt 
-          ≡⟨⟩
-            x
-          ∎
-        where open ≡.≡-Reasoning
+      .End-hom-contr : ∀ {a* b*} → (α : End fun₀ a* b*) → α ≡ idEnd
+      End-hom-contr {a*} {b*} α =
+        extEnd fun₀ λ a₀ →
+          ext₁₁ λ x@(lift x₀) →
+            begin
+              proj α a₀ x
+            ≡⟨⟩
+              (proj α a₀ ∘′ const x) tt₁
+            ≡⟨⟩
+              (proj α a₀ ∘ (lift ∘ on-nothing {a = a*} (const x₀) nothing ∘ lower)) tt₁
+            ≡⟨ ≡.cong-app (extranaturality α (const x₀)) tt₁ ⟩
+              ((lift ∘ on-nothing {a = b*} (const x₀) nothing ∘ lower) ∘ proj α ⊤) tt₁
+            ≡⟨⟩
+              (const x ∘ proj α ⊤) tt₁
+            ≡⟨⟩
+              x
+            ∎
+          where
+            tt₁ : Lift 1ℓ ⊤
+            tt₁ = lift tt
+
+            open ≡.≡-Reasoning
     
     -- In Haskell, `id` is the only inhabitant of type `∀ a. a → a`.
     -- The following is the corresponding statement in terms of End.
-    uniqueness : (α : End' hom) → Irrelevant (α ≡ idEnd')
+    uniqueness : ∀ {a* b*} → (α : End fun₀ a* b*) → Irrelevant (α ≡ idEnd)
     uniqueness α = [ End-hom-contr α ]
     
