@@ -15,7 +15,7 @@ open import Data.Empty
 open import Data.Maybe using (Maybe; nothing; just; maybe; maybe′)
 
 open import Relation.Binary.PropositionalEquality as ≡
-   using (_≡_)
+   using (_≡_; _≗_)
 
 open import ExtensionalityUtil
 
@@ -68,69 +68,76 @@ module _ {I : Set} (P : Profunctor (Maybe I)) where
 
   open End public
 
+  -- Extensionality for End.
+  -- 
+  -- Equality between (p₁ p₂ : End P a b)
+  -- can be proven from their contents' pointwise equality.
+  -- (uses extensionality for pointwise to function itself,
+  --  then uses irrelevance of extranaturality) 
   .extEnd : ∀ {a b : I → Set} {p₁ p₂ : End a b}
     → (∀ (x : Set) → p₁ .proj x ≡ p₂ .proj x)
     → p₁ ≡ p₂
   extEnd {p₁ = p₁} {p₂ = p₂} projEq with ext₁₁ projEq
   ... | ≡.refl = ≡.refl
 
-  dimapEnd : ∀ {a a′ b b′ : I → Set} → (a′ ~> a) → (b ~> b′) → End a b → End a′ b′
-  dimapEnd f g (mkEnd p _) .proj x = dimap (on-just f) (on-just g) (p x)
-  dimapEnd f g (mkEnd p exnatP) .extranaturality {x⁻} {x⁺} h =
-    begin
-      lmap (on-nothing h) (dimap (on-just f) (on-just g) (p x⁺))
-    ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p x⁺) ⟨
-      dimap (on-just f ∘ᵢ on-nothing h) (on-just g) (p x⁺)
-    ≡⟨ ≡.cong (λ fh → dimap fh (on-just g) (p x⁺)) (ext₀₀ $ on-just-nothing-commute f h) ⟩
-      dimap (on-nothing h ∘ᵢ on-just f) (on-just g) (p x⁺)
-    ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p x⁺) ⟩
-      dimap (on-just f) (on-just g) (lmap (on-nothing h) (p x⁺))
-    ≡⟨ ≡.cong (dimap _ _) (exnatP h) ⟩
-      dimap (on-just f) (on-just g) (rmap (on-nothing h) (p x⁻))
-    ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p x⁻) ⟨
-      dimap (on-just f) (on-just g ∘ᵢ on-nothing h) (p x⁻)
-    ≡⟨ ≡.cong (λ gh → dimap (on-just f) gh (p x⁻)) (ext₀₀ $ on-just-nothing-commute g h) ⟩
-      dimap (on-just f) (on-nothing h ∘ᵢ on-just g) (p x⁻)
-    ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p x⁻) ⟩
-      rmap (on-nothing h) (dimap (on-just f) (on-just g) (p x⁻))
-    ∎
-    where
-      open ≡.≡-Reasoning
-
-  .dimapEnd-id : ∀ {a b}
-    → dimapEnd {a = a} {b = b} idᵢ idᵢ ≡ id
-  dimapEnd-id = ext₁₁ λ p → extEnd λ x →
-    begin
-      dimap (on-just idᵢ) (on-just idᵢ) (p .proj x)
-    ≡⟨ ≡.cong₂ (λ f g → dimap f g (p .proj x)) on-just-id on-just-id ⟩
-      dimap idᵢ idᵢ (p .proj x)
-    ≡⟨ ≡.cong-app dimap-id (p .proj x) ⟩
-      p .proj x
-    ∎
-    where
-      open ≡.≡-Reasoning
-      
-      on-just-id : ∀ {c} {y} → on-just {x = y} (idᵢ {a = c}) ≡ idᵢ
-      on-just-id = ext₀₀ λ { (just _) → ≡.refl; nothing → ≡.refl } 
-  
-  .dimapEnd-∘ : ∀ {a a′ a″ b b′ b″}
-    → (f₁ : a″ ~> a′) (g₁ : b′ ~> b″) (f₂ : a′ ~> a) (g₂ : b ~> b′)
-    → dimapEnd (f₂ ∘ᵢ f₁) (g₁ ∘ᵢ g₂) ≡ dimapEnd f₁ g₁ ∘′ dimapEnd f₂ g₂
-  dimapEnd-∘ f₁ g₁ f₂ g₂ = ext₁₁ λ p → extEnd λ x →
+  private
+    dimapEnd : ∀ {a a′ b b′ : I → Set} → (a′ ~> a) → (b ~> b′) → End a b → End a′ b′
+    dimapEnd f g (mkEnd p _) .proj x = dimap (on-just f) (on-just g) (p x)
+    dimapEnd f g (mkEnd p exnatP) .extranaturality {x⁻} {x⁺} h =
       begin
-        dimap (on-just (f₂ ∘ᵢ f₁)) (on-just (g₁ ∘ᵢ g₂)) (p .proj x)
-      ≡⟨ ≡.cong₂ (λ f g → dimap f g (p .proj x)) (on-just-∘ _ _) (on-just-∘ _ _) ⟩
-        dimap (on-just f₂ ∘ᵢ on-just f₁) (on-just g₁ ∘ᵢ on-just g₂) (p .proj x)
-      ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p .proj x) ⟩
-        dimap (on-just f₁) (on-just g₁) (dimap (on-just f₂) (on-just g₂) (p .proj x))
+        lmap (on-nothing h) (dimap (on-just f) (on-just g) (p x⁺))
+      ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p x⁺) ⟨
+        dimap (on-just f ∘ᵢ on-nothing h) (on-just g) (p x⁺)
+      ≡⟨ ≡.cong (λ fh → dimap fh (on-just g) (p x⁺)) (ext₀₀ $ on-just-nothing-commute f h) ⟩
+        dimap (on-nothing h ∘ᵢ on-just f) (on-just g) (p x⁺)
+      ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p x⁺) ⟩
+        dimap (on-just f) (on-just g) (lmap (on-nothing h) (p x⁺))
+      ≡⟨ ≡.cong (dimap _ _) (exnatP h) ⟩
+        dimap (on-just f) (on-just g) (rmap (on-nothing h) (p x⁻))
+      ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p x⁻) ⟨
+        dimap (on-just f) (on-just g ∘ᵢ on-nothing h) (p x⁻)
+      ≡⟨ ≡.cong (λ gh → dimap (on-just f) gh (p x⁻)) (ext₀₀ $ on-just-nothing-commute g h) ⟩
+        dimap (on-just f) (on-nothing h ∘ᵢ on-just g) (p x⁻)
+      ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p x⁻) ⟩
+        rmap (on-nothing h) (dimap (on-just f) (on-just g) (p x⁻))
+      ∎
+      where
+        open ≡.≡-Reasoning
+
+    .dimapEnd-id : ∀ {a b}
+      → dimapEnd {a = a} {b = b} idᵢ idᵢ ≡ id
+    dimapEnd-id = ext₁₁ λ p → extEnd λ x →
+      begin
+        dimap (on-just idᵢ) (on-just idᵢ) (p .proj x)
+      ≡⟨ ≡.cong₂ (λ f g → dimap f g (p .proj x)) on-just-id on-just-id ⟩
+        dimap idᵢ idᵢ (p .proj x)
+      ≡⟨ ≡.cong-app dimap-id (p .proj x) ⟩
+        p .proj x
       ∎
       where
         open ≡.≡-Reasoning
         
-        on-just-∘ : ∀ {a₁ a₂ a₃} {y}
-          → (f : a₂ ~> a₃) (g : a₁ ~> a₂)
-          → on-just {x = y} (f ∘ᵢ g) ≡ on-just f ∘ᵢ on-just g
-        on-just-∘ f g = ext₀₀ λ { (just _) → ≡.refl; nothing → ≡.refl } 
+        on-just-id : ∀ {c} {y} → on-just {x = y} (idᵢ {a = c}) ≡ idᵢ
+        on-just-id = ext₀₀ λ { (just _) → ≡.refl; nothing → ≡.refl } 
+    
+    .dimapEnd-∘ : ∀ {a a′ a″ b b′ b″}
+      → (f₁ : a″ ~> a′) (g₁ : b′ ~> b″) (f₂ : a′ ~> a) (g₂ : b ~> b′)
+      → dimapEnd (f₂ ∘ᵢ f₁) (g₁ ∘ᵢ g₂) ≡ dimapEnd f₁ g₁ ∘′ dimapEnd f₂ g₂
+    dimapEnd-∘ f₁ g₁ f₂ g₂ = ext₁₁ λ p → extEnd λ x →
+        begin
+          dimap (on-just (f₂ ∘ᵢ f₁)) (on-just (g₁ ∘ᵢ g₂)) (p .proj x)
+        ≡⟨ ≡.cong₂ (λ f g → dimap f g (p .proj x)) (on-just-∘ _ _) (on-just-∘ _ _) ⟩
+          dimap (on-just f₂ ∘ᵢ on-just f₁) (on-just g₁ ∘ᵢ on-just g₂) (p .proj x)
+        ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p .proj x) ⟩
+          dimap (on-just f₁) (on-just g₁) (dimap (on-just f₂) (on-just g₂) (p .proj x))
+        ∎
+        where
+          open ≡.≡-Reasoning
+          
+          on-just-∘ : ∀ {a₁ a₂ a₃} {y}
+            → (f : a₂ ~> a₃) (g : a₁ ~> a₂)
+            → on-just {x = y} (f ∘ᵢ g) ≡ on-just f ∘ᵢ on-just g
+          on-just-∘ f g = ext₀₀ λ { (just _) → ≡.refl; nothing → ≡.refl }
   
   EndP : Profunctor I
   EndP .Carrier = End
@@ -174,14 +181,17 @@ module parametricity-id {I : Set} where
     }
   
   private
+    -- shorthand
+    tt₁ : Lift 1ℓ ⊤
+    tt₁ = lift tt
+    
+    -- Carrier type of fun₀ profunctor, definition unfolded
+    -- 
+    --   proj α a₀ : fun₀ [ maybe′ a* a₀ , maybe′ b* a₀ ]
+    --   proj α a₀ : Lift 1ℓ a₀ → Lift 1ℓ a₀
     _ : ∀ {a b : Maybe I → Set}
       → fun₀ [ a , b ] ≡ (Lift 1ℓ (a nothing) → Lift 1ℓ (b nothing))
     _ = ≡.refl
-
-    const-on-nothing : ∀ {a₀ b₀ : Set} (x₀ : b₀) {r : I → Set}
-      → (dummy : Lift 1ℓ a₀)
-      → lift {ℓ = 1ℓ} x₀ ≡ lift {ℓ = 1ℓ} (on-nothing {a = r} (λ (_ : a₀) → x₀) nothing (lower dummy))
-    const-on-nothing _ _ = ≡.refl
 
     .End-hom-contr : ∀ {a* b*} → (α : End fun₀ a* b*) → α ≡ idEnd
     End-hom-contr {a*} {b*} α =
@@ -200,11 +210,7 @@ module parametricity-id {I : Set} where
           ≡⟨⟩
             x
           ∎
-        where
-          tt₁ : Lift 1ℓ ⊤
-          tt₁ = lift tt
-
-          open ≡.≡-Reasoning
+        where open ≡.≡-Reasoning
   
   -- In Haskell, `id` is the only inhabitant of type `∀ a. a → a`.
   -- The following is the corresponding statement in terms of End.

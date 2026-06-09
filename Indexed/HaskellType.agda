@@ -36,6 +36,7 @@ open import Indexed.Profunctor [ ext₁₁ ]
   renaming (_+_ to _+P_; _×_ to _×P_)
 open import Indexed.Profunctor.End [ ext₁₁ ]
 
+-- Syntax of a (small but sufficient) subset of RankN Haskell type
 data Ty (V : Set) : Set where
   varTy : V → Ty V
   emptyTy : Ty V
@@ -72,7 +73,7 @@ data TyIso {V : Set} : Ty V → Ty V → Set where
   isoSym : ∀ {t u} → TyIso t u → TyIso u t
   isoTrans : ∀ {t u v} → TyIso t u → TyIso u v → TyIso t v
 
-weaken : ∀ {V W} (f : W → V) {u v} → TyIso u v → TyIsoAxiom (mapTy f u) (mapTy f v)
+weaken : ∀ {V W} (f : W → V) {u v} → TyIso u v → TyIso (mapTy f u) (mapTy f v)
 weaken = _
 
 -- * Interpreting
