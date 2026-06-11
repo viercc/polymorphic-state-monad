@@ -1,4 +1,4 @@
-{-# OPTIONS --without-K --irrelevant-projections #-}
+{-# OPTIONS --without-K --safe #-}
 
 open import Level
 open import Function
@@ -21,16 +21,16 @@ open import ExtensionalityUtil
 
 -- | Profunctors between (I → Set) and itself,
 --   their morphisms and isomorphism.
-module Indexed.Profunctor.End (irr-ext : IrrExtensionality 1ℓ 1ℓ) where
+module Indexed.Profunctor.End (irrext : IrrExtensionality 1ℓ 1ℓ) where
 
-open import Indexed.Profunctor irr-ext
+open import Indexed.Profunctor
+open WithExt irrext
+open import Indexed.Profunctor.Instances
+open InstancesWithExt irrext
 
 private
-  .ext₁₁ : Extensionality 1ℓ 1ℓ
-  ext₁₁ = irrelevant irr-ext
-
-  .ext₀₀ : Extensionality 0ℓ 0ℓ
-  ext₀₀ = lower-extensionality 1ℓ 1ℓ ext₁₁
+  irrext₀₀ : IrrExtensionality 0ℓ 0ℓ
+  irrext₀₀ = irrmap (lower-extensionality 1ℓ 1ℓ) irrext
 
 -- * Preliminary definitions
 
@@ -64,9 +64,15 @@ module _ {I : Set} (P : Profunctor (Maybe I)) where
         → lmap (on-nothing h) (proj x⁺) ≡ rmap (on-nothing h) (proj x⁻)
     
     field
-      .extranaturality : Extranaturality
+      extranaturality : Irrelevant Extranaturality
 
   open End public
+
+  private
+    congEnd : ∀ {a b : I → Set} {p₁ p₂ : End a b}
+      → p₁ .proj ≡ p₂ .proj
+      → p₁ ≡ p₂
+    congEnd ≡.refl = ≡.refl
 
   -- Extensionality for End.
   -- 
@@ -74,70 +80,91 @@ module _ {I : Set} (P : Profunctor (Maybe I)) where
   -- can be proven from their contents' pointwise equality.
   -- (uses extensionality for pointwise to function itself,
   --  then uses irrelevance of extranaturality) 
-  .extEnd : ∀ {a b : I → Set} {p₁ p₂ : End a b}
+  extEnd : Extensionality 1ℓ 1ℓ
+    → ∀ {a b : I → Set} {p₁ p₂ : End a b}
     → (∀ (x : Set) → p₁ .proj x ≡ p₂ .proj x)
     → p₁ ≡ p₂
-  extEnd {p₁ = p₁} {p₂ = p₂} projEq with ext₁₁ projEq
-  ... | ≡.refl = ≡.refl
+  extEnd ext projEq = congEnd (ext projEq)
 
   private
     dimapEnd : ∀ {a a′ b b′ : I → Set} → (a′ ~> a) → (b ~> b′) → End a b → End a′ b′
     dimapEnd f g (mkEnd p _) .proj x = dimap (on-just f) (on-just g) (p x)
-    dimapEnd f g (mkEnd p exnatP) .extranaturality {x⁻} {x⁺} h =
-      begin
-        lmap (on-nothing h) (dimap (on-just f) (on-just g) (p x⁺))
-      ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p x⁺) ⟨
-        dimap (on-just f ∘ᵢ on-nothing h) (on-just g) (p x⁺)
-      ≡⟨ ≡.cong (λ fh → dimap fh (on-just g) (p x⁺)) (ext₀₀ $ on-just-nothing-commute f h) ⟩
-        dimap (on-nothing h ∘ᵢ on-just f) (on-just g) (p x⁺)
-      ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p x⁺) ⟩
-        dimap (on-just f) (on-just g) (lmap (on-nothing h) (p x⁺))
-      ≡⟨ ≡.cong (dimap _ _) (exnatP h) ⟩
-        dimap (on-just f) (on-just g) (rmap (on-nothing h) (p x⁻))
-      ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p x⁻) ⟨
-        dimap (on-just f) (on-just g ∘ᵢ on-nothing h) (p x⁻)
-      ≡⟨ ≡.cong (λ gh → dimap (on-just f) gh (p x⁻)) (ext₀₀ $ on-just-nothing-commute g h) ⟩
-        dimap (on-just f) (on-nothing h ∘ᵢ on-just g) (p x⁻)
-      ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p x⁻) ⟩
-        rmap (on-nothing h) (dimap (on-just f) (on-just g) (p x⁻))
-      ∎
+    dimapEnd f g (mkEnd p exnat) .extranaturality =
+      dimap-∘ >>= λ dimap-∘# →
+      exnat >>= λ exnat# →
+      irrext₀₀ >>= λ ext →
+      irr[( λ {x⁻} {x⁺} h →
+        begin
+          lmap (on-nothing h) (dimap (on-just f) (on-just g) (p x⁺))
+        ≡⟨ dimap-∘# _ _ _ _ (p x⁺) ⟨
+          dimap (on-just f ∘ᵢ on-nothing h) (on-just g) (p x⁺)
+        ≡⟨ ≡.cong (λ fh → dimap fh (on-just g) (p x⁺)) (ext $ on-just-nothing-commute f h) ⟩
+          dimap (on-nothing h ∘ᵢ on-just f) (on-just g) (p x⁺)
+        ≡⟨ dimap-∘# _ _ _ _ (p x⁺) ⟩
+          dimap (on-just f) (on-just g) (lmap (on-nothing h) (p x⁺))
+        ≡⟨ ≡.cong (dimap _ _) (exnat# h) ⟩
+          dimap (on-just f) (on-just g) (rmap (on-nothing h) (p x⁻))
+        ≡⟨ dimap-∘# _ _ _ _ (p x⁻) ⟨
+          dimap (on-just f) (on-just g ∘ᵢ on-nothing h) (p x⁻)
+        ≡⟨ ≡.cong (λ gh → dimap (on-just f) gh (p x⁻)) (ext $ on-just-nothing-commute g h) ⟩
+          dimap (on-just f) (on-nothing h ∘ᵢ on-just g) (p x⁻)
+        ≡⟨ dimap-∘# _ _ _ _ (p x⁻) ⟩
+          rmap (on-nothing h) (dimap (on-just f) (on-just g) (p x⁻))
+        ∎
+      )]
       where
         open ≡.≡-Reasoning
 
-    .dimapEnd-id : ∀ {a b}
-      → dimapEnd {a = a} {b = b} idᵢ idᵢ ≡ id
-    dimapEnd-id = ext₁₁ λ p → extEnd λ x →
-      begin
-        dimap (on-just idᵢ) (on-just idᵢ) (p .proj x)
-      ≡⟨ ≡.cong₂ (λ f g → dimap f g (p .proj x)) on-just-id on-just-id ⟩
-        dimap idᵢ idᵢ (p .proj x)
-      ≡⟨ ≡.cong-app dimap-id (p .proj x) ⟩
-        p .proj x
-      ∎
+    dimapEnd-id : Irrelevant (∀ {a b} (p : End a b) → dimapEnd idᵢ idᵢ p ≡ p)
+    dimapEnd-id =
+      dimap-id >>= λ dimap-id# →
+      on-just-id >>= λ on-just-id# →
+      irrext >>= λ ext →
+      irr[( λ p → extEnd ext λ x →
+        begin
+          dimap (on-just idᵢ) (on-just idᵢ) (p .proj x)
+        ≡⟨ ≡.cong₂ (λ f g → dimap f g (p .proj x)) on-just-id# on-just-id# ⟩
+          dimap idᵢ idᵢ (p .proj x)
+        ≡⟨ dimap-id# (p .proj x) ⟩
+          p .proj x
+        ∎
+      )]
       where
         open ≡.≡-Reasoning
         
-        on-just-id : ∀ {c} {y} → on-just {x = y} (idᵢ {a = c}) ≡ idᵢ
-        on-just-id = ext₀₀ λ { (just _) → ≡.refl; nothing → ≡.refl } 
+        on-just-id : Irrelevant (∀ {c} {y} → on-just {x = y} (idᵢ {a = c}) ≡ idᵢ)
+        on-just-id = irrext₀₀ >>= λ ext
+          → irr[( ext λ { (just _) → ≡.refl; nothing → ≡.refl } )]
     
-    .dimapEnd-∘ : ∀ {a a′ a″ b b′ b″}
-      → (f₁ : a″ ~> a′) (g₁ : b′ ~> b″) (f₂ : a′ ~> a) (g₂ : b ~> b′)
-      → dimapEnd (f₂ ∘ᵢ f₁) (g₁ ∘ᵢ g₂) ≡ dimapEnd f₁ g₁ ∘′ dimapEnd f₂ g₂
-    dimapEnd-∘ f₁ g₁ f₂ g₂ = ext₁₁ λ p → extEnd λ x →
+    dimapEnd-∘ : Irrelevant (
+      ∀ {a a′ a″ b b′ b″}
+        → (f₁ : a″ ~> a′) (g₁ : b′ ~> b″) (f₂ : a′ ~> a) (g₂ : b ~> b′)
+        → (p : End a b)
+        → dimapEnd (f₂ ∘ᵢ f₁) (g₁ ∘ᵢ g₂) p ≡ dimapEnd f₁ g₁ (dimapEnd f₂ g₂ p)
+      )
+    dimapEnd-∘ = 
+      dimap-∘ >>= λ dimap-∘# →
+      on-just-∘ >>= λ on-just-∘# →
+      irrext >>= λ ext →
+      irr[( λ f₁ g₁ f₂ g₂ p → extEnd ext λ x →
         begin
           dimap (on-just (f₂ ∘ᵢ f₁)) (on-just (g₁ ∘ᵢ g₂)) (p .proj x)
-        ≡⟨ ≡.cong₂ (λ f g → dimap f g (p .proj x)) (on-just-∘ _ _) (on-just-∘ _ _) ⟩
+        ≡⟨ ≡.cong₂ (λ f g → dimap f g (p .proj x)) (on-just-∘# _ _) (on-just-∘# _ _) ⟩
           dimap (on-just f₂ ∘ᵢ on-just f₁) (on-just g₁ ∘ᵢ on-just g₂) (p .proj x)
-        ≡⟨ ≡.cong-app (dimap-∘ _ _ _ _) (p .proj x) ⟩
+        ≡⟨ dimap-∘# _ _ _ _ (p .proj x) ⟩
           dimap (on-just f₁) (on-just g₁) (dimap (on-just f₂) (on-just g₂) (p .proj x))
         ∎
+      )]
         where
           open ≡.≡-Reasoning
           
-          on-just-∘ : ∀ {a₁ a₂ a₃} {y}
-            → (f : a₂ ~> a₃) (g : a₁ ~> a₂)
-            → on-just {x = y} (f ∘ᵢ g) ≡ on-just f ∘ᵢ on-just g
-          on-just-∘ f g = ext₀₀ λ { (just _) → ≡.refl; nothing → ≡.refl }
+          on-just-∘ : Irrelevant (
+              ∀ {a₁ a₂ a₃} {y}
+                → (f : a₂ ~> a₃) (g : a₁ ~> a₂)
+                → on-just {x = y} (f ∘ᵢ g) ≡ on-just f ∘ᵢ on-just g
+            )
+          on-just-∘ = irrext₀₀ >>= λ ext →
+            irr[( λ _ _ → ext λ { (just _) → ≡.refl; nothing → ≡.refl } )]
   
   EndP : Profunctor I
   EndP .Carrier = End
@@ -151,9 +178,76 @@ module _ {I : Set} (P : Profunctor (Maybe I)) where
 --   (P ⇒ Q) → (EndP P ⇒ EndP Q)
 -- 2. The mapping is functorial
 -- 3. The mapping preserves Iso (immediate from 2. but things can be tedious)
+
+module _ {I : Set} where
+  open Profunctor
+  open NaturalTransformation
+
+  module _ {P Q : Profunctor (Maybe I)} where
+    mapEnd : (P ⇒ Q) -> (EndP P ⇒ EndP Q)
+    mapEnd nat .φ eP .proj x = nat .φ (eP .proj x)
+    mapEnd nat .φ eP .extranaturality =
+      nat .naturality >>= λ naturality# →
+      eP .extranaturality >>= λ exnat# →
+      irr[(λ {x⁻} {x⁺} h →
+        begin
+          lmap Q (on-nothing h) (nat .φ (eP .proj x⁺))
+        ≡⟨ naturality# _ _ _ ⟨
+          nat .φ (lmap P (on-nothing h) (eP .proj x⁺))
+        ≡⟨ ≡.cong (nat .φ) (exnat# h) ⟩
+          nat .φ (rmap P (on-nothing h) (eP .proj x⁻))
+        ≡⟨ naturality# _ _ _ ⟩
+          rmap Q (on-nothing h) (nat .φ (eP .proj x⁻))
+        ∎
+      )]
+      where open ≡.≡-Reasoning
+        
+    mapEnd nat .naturality =
+      nat .naturality >>= λ naturality# →
+      irrext >>= λ ext →
+      irr[( λ f g eP → extEnd Q ext λ x →
+        naturality# (on-just f) (on-just g) (eP .proj x)
+      )]
+
+  mapEnd-id : ∀ {P}
+    → Irrelevant (mapEnd (idNat {P = P}) ≡ idNat)
+  mapEnd-id = extNat λ _ → ≡.refl
+
+  mapEnd-∘ : ∀ {P Q R}
+    → (natQR : Q ⇒ R) → (natPQ : P ⇒ Q)
+    → Irrelevant (mapEnd (natQR ∘Nat natPQ) ≡ mapEnd natQR ∘Nat mapEnd natPQ)
+  mapEnd-∘ natQR natPQ = extNat λ _ → ≡.refl
+
+  module _ {P Q : Profunctor (Maybe I)} where
+    open NaturalIso
+
+    mapEndIso : (P ⇔ Q) → (EndP P ⇔ EndP Q)
+    mapEndIso iso .to = mapEnd (iso .to)
+    mapEndIso iso .from = mapEnd (iso .from)
+    mapEndIso iso .to-from = {!   !}
+    mapEndIso iso .from-to = {!   !}
+
 -- 4. End commutes with ×
 --    EndP (P × Q) ⇔ EndP P × EndP Q
 -- 
+module _ {I : Set} {P Q : Profunctor (Maybe I)} where
+  open Profunctor
+  open NaturalTransformation
+  open NaturalIso
+
+  private
+    End×⇒Fst : EndP (P × Q) ⇒ EndP P
+    End×⇒Fst = _
+
+    End×⇒Snd : EndP (P × Q) ⇒ EndP Q
+    End×⇒Snd = _
+
+    End×⇒×End : EndP (P × Q) ⇒ EndP P × EndP Q
+    End×⇒×End = _
+
+    ×End⇒End× : (EndP P × EndP Q) ⇒ EndP (P × Q)
+    ×End⇒End× = _
+
 -- 5. End commutes with (fun (k P) _), where k P represents
 --    a profunctor which does not use "the outermost variable" 
 -- 
@@ -166,6 +260,7 @@ module _ {I : Set} (P : Profunctor (Maybe I)) where
 --    where σ : Maybe (Maybe I) → Maybe (Maybe I)
 --    is the "swap two nothings" isomorphism
 
+{-
 module parametricity-id {I : Set} where
   -- Profunctor (a₀ → b₀)
   -- (ignores other type variables)
@@ -216,3 +311,4 @@ module parametricity-id {I : Set} where
   -- The following is the corresponding statement in terms of End.
   uniqueness : ∀ {a* b*} → (α : End fun₀ a* b*) → Irrelevant (α ≡ idEnd)
   uniqueness α = [ End-hom-contr α ]
+-}

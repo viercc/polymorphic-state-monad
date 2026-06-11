@@ -14,7 +14,10 @@ module ExtensionalityUtil where
 2ℓ = suc 1ℓ
 3ℓ = suc 2ℓ
 
-open import Data.Irrelevant public
+open import Data.Irrelevant
+   using (Irrelevant; _>>=_; _<*>_)
+   renaming (map to irrmap; [_] to irr[_])
+   public
 open import Axiom.Extensionality.Propositional public
 
 -- Extensionality under irrelevance
