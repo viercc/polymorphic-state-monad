@@ -221,11 +221,50 @@ module _ {I : Set} where
   module _ {P Q : Profunctor (Maybe I)} where
     open NaturalIso
 
+    map-rightInv : (iso : P ⇔ Q)
+      → Irrelevant (mapEnd (iso .to) ∘Nat mapEnd (iso .from) ≡ idNat)
+    map-rightInv iso =
+      iso-rightInv iso >>= λ rightInv# →
+      mapEnd-id >>= λ map-id# →
+      mapEnd-∘ (iso .to) (iso .from) >>= λ map-∘# →
+      irr[(
+        begin
+          mapEnd (iso .to) ∘Nat mapEnd (iso .from)
+        ≡⟨ map-∘# ⟨
+          mapEnd (iso .to ∘Nat iso .from)
+        ≡⟨ ≡.cong mapEnd rightInv# ⟩
+          mapEnd idNat
+        ≡⟨ map-id# ⟩
+          idNat
+        ∎
+      )]
+      where open ≡.≡-Reasoning
+
+    map-leftInv : (iso : P ⇔ Q)
+      → Irrelevant (mapEnd (iso .from) ∘Nat mapEnd (iso .to) ≡ idNat)
+    map-leftInv iso =
+      iso-leftInv iso >>= λ leftInv# →
+      mapEnd-id >>= λ map-id# →
+      mapEnd-∘ (iso .from) (iso .to) >>= λ map-∘# →
+      irr[(
+        begin
+          mapEnd (iso .from) ∘Nat mapEnd (iso .to)
+        ≡⟨ map-∘# ⟨
+          mapEnd (iso .from ∘Nat iso .to)
+        ≡⟨ ≡.cong mapEnd leftInv# ⟩
+          mapEnd idNat
+        ≡⟨ map-id# ⟩
+          idNat
+        ∎
+      )]
+      where open ≡.≡-Reasoning
+    
     mapEndIso : (P ⇔ Q) → (EndP P ⇔ EndP Q)
-    mapEndIso iso .to = mapEnd (iso .to)
-    mapEndIso iso .from = mapEnd (iso .from)
-    mapEndIso iso .to-from = {!   !}
-    mapEndIso iso .from-to = {!   !}
+    mapEndIso iso =
+      let irr[ leftInv# ] = map-leftInv iso
+          irr[ rightInv# ] = map-rightInv iso
+      in naturalIsoBy≡ (mapEnd (iso .to)) (mapEnd (iso .from))
+           rightInv# leftInv#
 
 -- 4. End commutes with ×
 --    EndP (P × Q) ⇔ EndP P × EndP Q

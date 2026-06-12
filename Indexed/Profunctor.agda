@@ -140,6 +140,26 @@ open NaturalIso
 
 syntax NaturalIso P Q = P ⇔ Q
 
+-- Given a "≡ on NaturalTransformation" isomorphism proofs,
+-- which are stronger claims than pointwise equalities of φ,
+-- construct a NaturalIso.
+naturalIsoBy≡ : ∀ {I : Set} {P Q : Profunctor I}
+  (f : P ⇒ Q) (g : Q ⇒ P)
+  → .(f ∘Nat g ≡ idNat)
+  → .(g ∘Nat f ≡ idNat)
+  → P ⇔ Q
+naturalIsoBy≡ f g fg≡id gf≡id = 
+  record {
+    to = f;
+    from = g;
+    to-from = irr[(
+      λ q → ≡.cong (λ nat → nat .φ q) fg≡id
+    )];
+    from-to = irr[(
+      λ p → ≡.cong (λ nat → nat .φ p) gf≡id
+    )]
+  }
+
 module WithExt (irrext : IrrExtensionality 1ℓ 1ℓ) where
   module _ {I : Set} {P Q : Profunctor I} where
     private
@@ -191,6 +211,17 @@ module WithExt (irrext : IrrExtensionality 1ℓ 1ℓ) where
             )]
           where
             open ≡.≡-Reasoning
+    
+    -- Converse of naturalIsoBy≡.
+    -- Recovers "≡ on NaturalTransformation"-style isomorphism proofs.
+
+    iso-rightInv : ∀ (iso : P ⇔ Q)
+      → Irrelevant (iso .to ∘Nat iso .from ≡ idNat)
+    iso-rightInv iso = iso .to-from >>= extNat
+    
+    iso-leftInv : ∀ (iso : P ⇔ Q)
+      → Irrelevant (iso .from ∘Nat iso .to ≡ idNat)
+    iso-leftInv iso = iso .from-to >>= extNat
 
 -- TODO:
 -- 
