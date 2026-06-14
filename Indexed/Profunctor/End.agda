@@ -21,16 +21,16 @@ open import ExtensionalityUtil
 
 -- | Profunctors between (I → Set) and itself,
 --   their morphisms and isomorphism.
-module Indexed.Profunctor.End (irrext : IrrExtensionality 1ℓ 1ℓ) where
+module Indexed.Profunctor.End .(ext : Extensionality 1ℓ 1ℓ) where
 
 open import Indexed.Profunctor
-open WithExt irrext
+open WithExt ext
 open import Indexed.Profunctor.Instances
-open InstancesWithExt irrext
+open InstancesWithExt ext
 
 private
-  irrext₀₀ : IrrExtensionality 0ℓ 0ℓ
-  irrext₀₀ = irrmap (lower-extensionality 1ℓ 1ℓ) irrext
+  lower-ext₀₀ : Extensionality 1ℓ 1ℓ → Extensionality 0ℓ 0ℓ
+  lower-ext₀₀ = lower-extensionality 1ℓ 1ℓ
 
 -- * Preliminary definitions
 
@@ -47,6 +47,15 @@ private
     → (f : a ~> b) (h : x → x′)
     → ∀ mi → (on-just f ∘ᵢ on-nothing h) mi ≡ (on-nothing h ∘ᵢ on-just f) mi
   on-just-nothing-commute f h = λ { nothing  → ≡.refl; (just _) → ≡.refl }
+
+  on-just-id : ∀ {I : Set} (c : I → Set) y → ∀ mi → on-just {x = y} (idᵢ {a = c}) mi ≡ id
+  on-just-id _ _ = λ { (just _) → ≡.refl; nothing → ≡.refl }
+  
+  on-just-∘ : 
+      ∀ {I : Set} {a₁ a₂ a₃ : I → Set} {y}
+        → (f : a₂ ~> a₃) (g : a₁ ~> a₂)
+        → ∀ mi → on-just {x = y} (f ∘ᵢ g) mi ≡ (on-just f ∘ᵢ on-just g) mi
+  on-just-∘ _ _ = λ { (just _) → ≡.refl; nothing → ≡.refl }
 
 -- * (one-variable) End of a Profunctor
 
@@ -92,13 +101,13 @@ module _ {I : Set} (P : Profunctor (Maybe I)) where
     dimapEnd f g (mkEnd p exnat) .extranaturality =
       dimap-∘ >>= λ dimap-∘# →
       exnat >>= λ exnat# →
-      irrext₀₀ >>= λ ext →
       irr[( λ {x⁻} {x⁺} h →
-        begin
+        let ext₀₀ = lower-extensionality 1ℓ 1ℓ ext
+        in begin
           lmap (on-nothing h) (dimap (on-just f) (on-just g) (p x⁺))
         ≡⟨ dimap-∘# _ _ _ _ (p x⁺) ⟨
           dimap (on-just f ∘ᵢ on-nothing h) (on-just g) (p x⁺)
-        ≡⟨ ≡.cong (λ fh → dimap fh (on-just g) (p x⁺)) (ext $ on-just-nothing-commute f h) ⟩
+        ≡⟨ ≡.cong (λ fh → dimap fh (on-just g) (p x⁺)) (ext₀₀ $ on-just-nothing-commute f h) ⟩
           dimap (on-nothing h ∘ᵢ on-just f) (on-just g) (p x⁺)
         ≡⟨ dimap-∘# _ _ _ _ (p x⁺) ⟩
           dimap (on-just f) (on-just g) (lmap (on-nothing h) (p x⁺))
@@ -106,7 +115,7 @@ module _ {I : Set} (P : Profunctor (Maybe I)) where
           dimap (on-just f) (on-just g) (rmap (on-nothing h) (p x⁻))
         ≡⟨ dimap-∘# _ _ _ _ (p x⁻) ⟨
           dimap (on-just f) (on-just g ∘ᵢ on-nothing h) (p x⁻)
-        ≡⟨ ≡.cong (λ gh → dimap (on-just f) gh (p x⁻)) (ext $ on-just-nothing-commute g h) ⟩
+        ≡⟨ ≡.cong (λ gh → dimap (on-just f) gh (p x⁻)) (ext₀₀ $ on-just-nothing-commute g h) ⟩
           dimap (on-just f) (on-nothing h ∘ᵢ on-just g) (p x⁻)
         ≡⟨ dimap-∘# _ _ _ _ (p x⁻) ⟩
           rmap (on-nothing h) (dimap (on-just f) (on-just g) (p x⁻))
@@ -118,12 +127,11 @@ module _ {I : Set} (P : Profunctor (Maybe I)) where
     dimapEnd-id : Irrelevant (∀ {a b} (p : End a b) → dimapEnd idᵢ idᵢ p ≡ p)
     dimapEnd-id =
       dimap-id >>= λ dimap-id# →
-      on-just-id >>= λ on-just-id# →
-      irrext >>= λ ext →
-      irr[( λ p → extEnd ext λ x →
-        begin
+      irr[( λ {a} {b} p → extEnd ext λ x →
+        let ext₀₀ = lower-extensionality 1ℓ 1ℓ ext
+        in begin
           dimap (on-just idᵢ) (on-just idᵢ) (p .proj x)
-        ≡⟨ ≡.cong₂ (λ f g → dimap f g (p .proj x)) on-just-id# on-just-id# ⟩
+        ≡⟨ ≡.cong₂ (λ f g → dimap f g (p .proj x)) (ext₀₀ (on-just-id a x)) (ext₀₀ (on-just-id b x)) ⟩
           dimap idᵢ idᵢ (p .proj x)
         ≡⟨ dimap-id# (p .proj x) ⟩
           p .proj x
@@ -131,10 +139,6 @@ module _ {I : Set} (P : Profunctor (Maybe I)) where
       )]
       where
         open ≡.≡-Reasoning
-        
-        on-just-id : Irrelevant (∀ {c} {y} → on-just {x = y} (idᵢ {a = c}) ≡ idᵢ)
-        on-just-id = irrext₀₀ >>= λ ext
-          → irr[( ext λ { (just _) → ≡.refl; nothing → ≡.refl } )]
     
     dimapEnd-∘ : Irrelevant (
       ∀ {a a′ a″ b b′ b″}
@@ -144,12 +148,11 @@ module _ {I : Set} (P : Profunctor (Maybe I)) where
       )
     dimapEnd-∘ = 
       dimap-∘ >>= λ dimap-∘# →
-      on-just-∘ >>= λ on-just-∘# →
-      irrext >>= λ ext →
       irr[( λ f₁ g₁ f₂ g₂ p → extEnd ext λ x →
-        begin
+        let ext₀₀ = lower-extensionality 1ℓ 1ℓ ext
+        in begin
           dimap (on-just (f₂ ∘ᵢ f₁)) (on-just (g₁ ∘ᵢ g₂)) (p .proj x)
-        ≡⟨ ≡.cong₂ (λ f g → dimap f g (p .proj x)) (on-just-∘# _ _) (on-just-∘# _ _) ⟩
+        ≡⟨ ≡.cong₂ (λ f g → dimap f g (p .proj x)) (ext₀₀ (on-just-∘ f₂ f₁)) (ext₀₀ (on-just-∘ g₁ g₂)) ⟩
           dimap (on-just f₂ ∘ᵢ on-just f₁) (on-just g₁ ∘ᵢ on-just g₂) (p .proj x)
         ≡⟨ dimap-∘# _ _ _ _ (p .proj x) ⟩
           dimap (on-just f₁) (on-just g₁) (dimap (on-just f₂) (on-just g₂) (p .proj x))
@@ -158,13 +161,6 @@ module _ {I : Set} (P : Profunctor (Maybe I)) where
         where
           open ≡.≡-Reasoning
           
-          on-just-∘ : Irrelevant (
-              ∀ {a₁ a₂ a₃} {y}
-                → (f : a₂ ~> a₃) (g : a₁ ~> a₂)
-                → on-just {x = y} (f ∘ᵢ g) ≡ on-just f ∘ᵢ on-just g
-            )
-          on-just-∘ = irrext₀₀ >>= λ ext →
-            irr[( λ _ _ → ext λ { (just _) → ≡.refl; nothing → ≡.refl } )]
   
   EndP : Profunctor I
   EndP .Carrier = End
@@ -204,7 +200,6 @@ module _ {I : Set} where
         
     mapEnd nat .naturality =
       nat .naturality >>= λ naturality# →
-      irrext >>= λ ext →
       irr[( λ f g eP → extEnd Q ext λ x →
         naturality# (on-just f) (on-just g) (eP .proj x)
       )]

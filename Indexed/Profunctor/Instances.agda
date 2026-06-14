@@ -133,7 +133,7 @@ module _ where
     where
       open Profunctor
 
-module InstancesWithExt (irrext : IrrExtensionality 1ℓ 1ℓ) where
+module InstancesWithExt .(ext : Extensionality 1ℓ 1ℓ) where
   private
     module _ {A B C D : Set₁} where
       dimap-fun : (B → A) → (C → D) → (A → C) → (B → D)
@@ -162,14 +162,12 @@ module InstancesWithExt (irrext : IrrExtensionality 1ℓ 1ℓ) where
       dimap-id = 
         dimap-id P >>= λ dimap-id-P →
         dimap-id Q >>= λ dimap-id-Q →
-        irrext >>= λ ext →
         irr[( λ pq →
           ext (dimap-fun-cong dimap-id-P dimap-id-Q pq)
         )];
       dimap-∘ = 
         dimap-∘ P >>= λ dimap-∘-P →
         dimap-∘ Q >>= λ dimap-∘-Q →
-        irrext >>= λ ext →
         irr[( λ f₁ g₁ f₂ g₂ pq →
         let eqP = dimap-∘-P g₂ f₂ g₁ f₁
             eqQ = dimap-∘-Q f₁ g₁ f₂ g₂
@@ -179,6 +177,7 @@ module InstancesWithExt (irrext : IrrExtensionality 1ℓ 1ℓ) where
     where
       open Profunctor
       open ≡.≡-Reasoning
+      
 
 var : ∀ {I} → I → Profunctor I
 var i = record {
@@ -207,8 +206,8 @@ k = mapIndex just
 --    All up to iso (_⇔_)
 
 private
-  module examples (irrext : IrrExtensionality 1ℓ 1ℓ) where
-    open InstancesWithExt irrext
+  module examples .(ext : Extensionality 1ℓ 1ℓ) where
+    open InstancesWithExt ext
 
     _ : ∀ a b →
       (fun (v0 {⊥} × fun v0 v0) v0) [ a , b ]

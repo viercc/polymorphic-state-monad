@@ -160,7 +160,10 @@ naturalIsoBy≡ f g fg≡id gf≡id =
     )]
   }
 
-module WithExt (irrext : IrrExtensionality 1ℓ 1ℓ) where
+-- Theorems depending on function extensionality.
+-- The supplied extensionality is marked irrelevant,
+-- so that its use is restricted to irrelevant contexts.
+module WithExt .(ext : Extensionality 1ℓ 1ℓ) where
   module _ {I : Set} {P Q : Profunctor I} where
     private
       congNat : ∀ {nat1 nat2 : P ⇒ Q}
@@ -171,7 +174,7 @@ module WithExt (irrext : IrrExtensionality 1ℓ 1ℓ) where
     extNat : ∀ {nat1 nat2 : P ⇒ Q}
       → .(∀ {a b : I → Set} (p : P [ a , b ]) → nat1 .φ p ≡ nat2 .φ p)
       → Irrelevant (nat1 ≡ nat2)
-    extNat {nat1 = nat1} {nat2 = nat2} eqφ = irrext >>= λ ext →
+    extNat {nat1 = nat1} {nat2 = nat2} eqφ =
         let .iext : ExtensionalityImplicit 1ℓ 1ℓ
             iext = implicit-extensionality ext
         in irr[ congNat (iext (iext (ext eqφ))) ]
