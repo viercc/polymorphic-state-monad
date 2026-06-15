@@ -177,7 +177,6 @@ module _ {I : Set} (P : Profunctor (Maybe I)) where
 
 module _ {I : Set} where
   open Profunctor
-  open NaturalTransformation
 
   module _ {P Q : Profunctor (Maybe I)} where
     mapEnd : (P ⇒ Q) -> (EndP P ⇒ EndP Q)
@@ -266,7 +265,6 @@ module _ {I : Set} where
 -- 
 module _ {I : Set} {P Q : Profunctor (Maybe I)} where
   open Profunctor
-  open NaturalTransformation
   open NaturalIso
 
   private

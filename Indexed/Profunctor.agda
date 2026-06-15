@@ -108,9 +108,9 @@ record NaturalTransformation {I : Set} (P Q : Profunctor I) : Set₁ where
   field
     naturality : Irrelevant Naturality
 
-open NaturalTransformation
+open NaturalTransformation public
 
-infix 7 NaturalTransformation
+infix 1 NaturalTransformation
 syntax NaturalTransformation a b = a ⇒ b
 
 idNat : {I : Set} {P : Profunctor I} → P ⇒ P
@@ -138,6 +138,7 @@ record NaturalIso {I : Set} (P Q : Profunctor I) : Set₁ where
 
 open NaturalIso
 
+infix 1 NaturalIso
 syntax NaturalIso P Q = P ⇔ Q
 
 -- Given a "≡ on NaturalTransformation" isomorphism proofs,

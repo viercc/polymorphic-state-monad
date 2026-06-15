@@ -44,6 +44,16 @@ constant c = record {
     dimap-∘ = irr[( λ _ _ _ _ _ → ≡.refl )]
   }
 
+-- Special constants
+empty unit : ∀ {I} → Profunctor I
+empty = constant ⊥
+unit = constant ⊤
+
+elim-empty : ∀ {I} {P : Profunctor I}
+  → empty ⇒ P
+elim-empty .φ = λ ()
+elim-empty .naturality = irr[( λ _ _ () )]
+
 module _ where
 
   private
@@ -66,6 +76,8 @@ module _ where
       → ∀ x → map+ (h₁ ∘′ h₂) (j₁ ∘′ j₂) x ≡ map+ h₁ j₁ (map+ h₂ j₂ x)
     map+-∘ _ _ _ _ (Sum.inj₁ _) = ≡.refl
     map+-∘ _ _ _ _ (Sum.inj₂ _) = ≡.refl
+
+  infixr 2 _+_
 
   _+_ : ∀ {I} → Profunctor I → Profunctor I → Profunctor I
   _+_ {I} P Q =
@@ -104,11 +116,100 @@ module _ where
       open Profunctor
       open ≡.≡-Reasoning
 
+module _ {I : Set} where
+  open NaturalTransformation
+  open NaturalIso
+
+  private
+    variable
+      P Q R : Profunctor I
+
+  inl : P ⇒ P + Q
+  inl .φ = Sum.inj₁
+  inl .naturality = irr[( λ _ _ _ → ≡.refl )]
+
+  inr : Q ⇒ P + Q
+  inr .φ = Sum.inj₂
+  inr .naturality = irr[( λ _ _ _ → ≡.refl )]
+
+  either : (P ⇒ R) → (Q ⇒ R) → (P + Q) ⇒ R
+  either pr qr .φ = Sum.[ pr .φ , qr .φ ]
+  either pr qr .naturality =
+    pr .naturality >>= λ pr-nat# →
+    qr .naturality >>= λ qr-nat# →
+    irr[(
+      λ f g → Sum.[ pr-nat# f g , qr-nat# f g ]
+    )]
+  
+  +-swap : P + Q ⇒ Q + P
+  +-swap .φ = Sum.swap
+  +-swap .naturality = irr[(
+      λ f g → Sum.[ (λ _ → ≡.refl) , (λ _ → ≡.refl) ]
+    )]
+
+  +-assocʳ : (P + Q) + R ⇒ P + (Q + R)
+  +-assocʳ .φ = Sum.assocʳ
+  +-assocʳ .naturality = irr[( λ f g →
+      λ {
+        (Sum.inj₁ (Sum.inj₁ p)) → ≡.refl;
+        (Sum.inj₁ (Sum.inj₂ q)) → ≡.refl;
+        (Sum.inj₂ r) → ≡.refl 
+      }
+    )]
+
+  +-assocˡ : P + (Q + R) ⇒ (P + Q) + R
+  +-assocˡ .φ = Sum.assocˡ
+  +-assocˡ .naturality = irr[( λ f g →
+      λ {
+        (Sum.inj₁ p) → ≡.refl;
+        (Sum.inj₂ (Sum.inj₁ q)) → ≡.refl;
+        (Sum.inj₂ (Sum.inj₂ r)) → ≡.refl 
+      }
+    )]
+
+  +-leftUnit : empty + P ⇔ P
+  +-leftUnit .to = either elim-empty idNat
+  +-leftUnit .from = inr {P = empty}
+  +-leftUnit .to-from = irr[( λ _ → ≡.refl )]
+  +-leftUnit .from-to = irr[ Sum.[ (λ ()) , (λ _ → ≡.refl) ] ]
+
+  +-rightUnit : P + empty ⇔ P
+  +-rightUnit .to = either idNat elim-empty
+  +-rightUnit .from = inl {Q = empty}
+  +-rightUnit .to-from = irr[( λ _ → ≡.refl )]
+  +-rightUnit .from-to = irr[ Sum.[ (λ _ → ≡.refl), (λ ()) ] ] 
+
+  +-assoc : (P + Q) + R ⇔ P + (Q + R)
+  +-assoc {P} {Q} {R} .to = +-assocʳ {P} {Q} {R}
+  +-assoc {P} {Q} {R} .from = +-assocˡ {P} {Q} {R}
+  +-assoc .to-from = irr[(
+      λ {
+        (Sum.inj₁ p) → ≡.refl;
+        (Sum.inj₂ (Sum.inj₁ q)) → ≡.refl;
+        (Sum.inj₂ (Sum.inj₂ r)) → ≡.refl 
+      }
+    )]
+  +-assoc .from-to = irr[(
+      λ {
+        (Sum.inj₁ (Sum.inj₁ p)) → ≡.refl;
+        (Sum.inj₁ (Sum.inj₂ q)) → ≡.refl;
+        (Sum.inj₂ r) → ≡.refl 
+      }
+    )]
+  
+  +-swapIso : P + Q ⇔ Q + P
+  +-swapIso {P} {Q} .to = +-swap {P} {Q}
+  +-swapIso {P} {Q} .from = +-swap {Q} {P}
+  +-swapIso .to-from = irr[ Sum.[ (λ _ → ≡.refl) , (λ _ → ≡.refl) ] ]
+  +-swapIso .from-to = irr[ Sum.[ (λ _ → ≡.refl) , (λ _ → ≡.refl) ] ]
+
 module _ where
   private
     map× : ∀ {A B C D : Set₁} → (A → C) → (B → D)
       → A Prod.× B → C Prod.× D
     map× f g = Prod.map f g
+
+  infixr 3 _×_
 
   _×_ : ∀ {I} → Profunctor I → Profunctor I → Profunctor I
   _×_ {I} P Q =
@@ -132,6 +233,21 @@ module _ where
     }
     where
       open Profunctor
+
+
+var : ∀ {I} → I → Profunctor I
+var i = record {
+    Carrier = λ _ b → Lift 1ℓ (b i);
+    dimap = λ _ g p → lift (g i (lower p)) ;
+    dimap-id = irr[( λ _ → ≡.refl )];
+    dimap-∘ = irr[( λ _ _ _ _ _ → ≡.refl )]
+  }
+
+v0 : ∀ {I} → Profunctor (Maybe I)
+v0 = var nothing
+
+k : ∀ {I} → Profunctor I → Profunctor (Maybe I)
+k = mapIndex just
 
 module InstancesWithExt .(ext : Extensionality 1ℓ 1ℓ) where
   private
@@ -178,20 +294,6 @@ module InstancesWithExt .(ext : Extensionality 1ℓ 1ℓ) where
       open Profunctor
       open ≡.≡-Reasoning
       
-
-var : ∀ {I} → I → Profunctor I
-var i = record {
-    Carrier = λ _ b → Lift 1ℓ (b i);
-    dimap = λ _ g p → lift (g i (lower p)) ;
-    dimap-id = irr[( λ _ → ≡.refl )];
-    dimap-∘ = irr[( λ _ _ _ _ _ → ≡.refl )]
-  }
-
-v0 : ∀ {I} → Profunctor (Maybe I)
-v0 = var nothing
-
-k : ∀ {I} → Profunctor I → Profunctor (Maybe I)
-k = mapIndex just
 
 -- TODO:
 -- 
