@@ -229,5 +229,5 @@ module WithExt .(ext : Extensionality 1ℓ 1ℓ) where
 
 -- TODO:
 -- 
--- 1. idIso, _∘Iso_, symIso (refl, sym, and trans respectively)
+-- 1. idIso, _∘Iso_, symIso (refl, trans, and sym respectively)
 -- 2. Send (iso)morphisms over index remap
