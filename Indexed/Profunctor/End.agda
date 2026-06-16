@@ -292,55 +292,57 @@ module _ {I : Set} {P Q : Profunctor (Maybe I)} where
 --    where σ : Maybe (Maybe I) → Maybe (Maybe I)
 --    is the "swap two nothings" isomorphism
 
-{-
-module parametricity-id {I : Set} where
-  -- Profunctor (a₀ → b₀)
-  -- (ignores other type variables)
-  fun₀ : Profunctor (Maybe I)
-  fun₀ = fun v0 v0
+private
+  -- Example usage
 
-  open Profunctor fun₀
+  module parametricity-id {I : Set} where
+    -- Profunctor (a₀ → b₀)
+    -- (ignores other type variables)
+    fun₀ : Profunctor (Maybe I)
+    fun₀ = fun v0 v0
 
-  idEnd : ∀ {a* b*} → End fun₀ a* b*
-  idEnd = record {
-      proj = λ _ → id;
-      extranaturality = λ _ → ≡.refl
-    }
-  
-  private
-    -- shorthand
-    tt₁ : Lift 1ℓ ⊤
-    tt₁ = lift tt
+    open Profunctor fun₀
+
+    idEnd : ∀ {a* b*} → End fun₀ a* b*
+    idEnd = record {
+        proj = λ _ → id;
+        extranaturality = irr[( λ _ → ≡.refl )]
+      }
     
-    -- Carrier type of fun₀ profunctor, definition unfolded
-    -- 
-    --   proj α a₀ : fun₀ [ maybe′ a* a₀ , maybe′ b* a₀ ]
-    --   proj α a₀ : Lift 1ℓ a₀ → Lift 1ℓ a₀
-    _ : ∀ {a b : Maybe I → Set}
-      → fun₀ [ a , b ] ≡ (Lift 1ℓ (a nothing) → Lift 1ℓ (b nothing))
-    _ = ≡.refl
-
-    .End-hom-contr : ∀ {a* b*} → (α : End fun₀ a* b*) → α ≡ idEnd
-    End-hom-contr {a*} {b*} α =
-      extEnd fun₀ λ a₀ →
-        ext₁₁ λ x@(lift x₀) →
-          begin
-            proj α a₀ x
-          ≡⟨⟩
-            (proj α a₀ ∘′ const x) tt₁
-          ≡⟨⟩
-            (proj α a₀ ∘ (lift ∘ on-nothing {a = a*} (const x₀) nothing ∘ lower)) tt₁
-          ≡⟨ ≡.cong-app (extranaturality α (const x₀)) tt₁ ⟩
-            ((lift ∘ on-nothing {a = b*} (const x₀) nothing ∘ lower) ∘ proj α ⊤) tt₁
-          ≡⟨⟩
-            (const x ∘ proj α ⊤) tt₁
-          ≡⟨⟩
-            x
-          ∎
-        where open ≡.≡-Reasoning
-  
-  -- In Haskell, `id` is the only inhabitant of type `∀ a. a → a`.
-  -- The following is the corresponding statement in terms of End.
-  uniqueness : ∀ {a* b*} → (α : End fun₀ a* b*) → Irrelevant (α ≡ idEnd)
-  uniqueness α = [ End-hom-contr α ]
--}
+    private
+      -- shorthand
+      tt₁ : Lift 1ℓ ⊤
+      tt₁ = lift tt
+      
+      -- Carrier type of fun₀ profunctor, definition unfolded
+      -- 
+      --   proj α a₀ : fun₀ [ maybe′ a* a₀ , maybe′ b* a₀ ]
+      --   proj α a₀ : Lift 1ℓ a₀ → Lift 1ℓ a₀
+      _ : ∀ {a b : Maybe I → Set}
+        → fun₀ [ a , b ] ≡ (Lift 1ℓ (a nothing) → Lift 1ℓ (b nothing))
+      _ = ≡.refl
+    
+    -- In Haskell, `id` is the only inhabitant of type `∀ a. a → a`.
+    -- The following is the corresponding statement in terms of End.
+    uniqueness : ∀ {a* b*} → (α : End fun₀ a* b*) → Irrelevant (α ≡ idEnd)
+    uniqueness {a*} {b*} α =
+      α .extranaturality >>= λ exnat# →
+      irr[( 
+        extEnd fun₀ ext λ a₀ →
+          ext λ x@(lift x₀) →
+            begin
+              proj α a₀ x
+            ≡⟨⟩
+              (proj α a₀ ∘′ const x) tt₁
+            ≡⟨⟩
+              (proj α a₀ ∘ (lift ∘ on-nothing {a = a*} (const x₀) nothing ∘ lower)) tt₁
+            ≡⟨ ≡.cong-app (exnat# (const x₀)) tt₁ ⟩
+              ((lift ∘ on-nothing {a = b*} (const x₀) nothing ∘ lower) ∘ proj α ⊤) tt₁
+            ≡⟨⟩
+              (const x ∘ proj α ⊤) tt₁
+            ≡⟨⟩
+              x
+            ∎
+      )]
+      where
+        open ≡.≡-Reasoning
