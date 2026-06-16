@@ -54,6 +54,11 @@ elim-empty : ∀ {I} {P : Profunctor I}
 elim-empty .φ = λ ()
 elim-empty .naturality = irr[( λ _ _ () )]
 
+bang-unit : ∀ {I} {P : Profunctor I}
+  → P ⇒ unit
+bang-unit .φ = λ _ → lift tt
+bang-unit .naturality = irr[( λ _ _ _ → ≡.refl )]
+
 module _ where
 
   private
@@ -167,17 +172,17 @@ module _ {I : Set} where
       }
     )]
 
-  +-leftUnit : empty + P ⇔ P
-  +-leftUnit .to = either elim-empty idNat
-  +-leftUnit .from = inr {P = empty}
-  +-leftUnit .to-from = irr[( λ _ → ≡.refl )]
-  +-leftUnit .from-to = irr[ Sum.[ (λ ()) , (λ _ → ≡.refl) ] ]
+  +-unitˡ : empty + P ⇔ P
+  +-unitˡ .to = either elim-empty idNat
+  +-unitˡ .from = inr {P = empty}
+  +-unitˡ .to-from = irr[( λ _ → ≡.refl )]
+  +-unitˡ .from-to = irr[ Sum.[ (λ ()) , (λ _ → ≡.refl) ] ]
 
-  +-rightUnit : P + empty ⇔ P
-  +-rightUnit .to = either idNat elim-empty
-  +-rightUnit .from = inl {Q = empty}
-  +-rightUnit .to-from = irr[( λ _ → ≡.refl )]
-  +-rightUnit .from-to = irr[ Sum.[ (λ _ → ≡.refl), (λ ()) ] ] 
+  +-unitʳ : P + empty ⇔ P
+  +-unitʳ .to = either idNat elim-empty
+  +-unitʳ .from = inl {Q = empty}
+  +-unitʳ .to-from = irr[( λ _ → ≡.refl )]
+  +-unitʳ .from-to = irr[ Sum.[ (λ _ → ≡.refl), (λ ()) ] ] 
 
   +-assoc : (P + Q) + R ⇔ P + (Q + R)
   +-assoc {P} {Q} {R} .to = +-assocʳ {P} {Q} {R}
@@ -233,7 +238,66 @@ module _ where
     }
     where
       open Profunctor
+  
+module _ {I : Set} where
+  open Profunctor
+  open NaturalTransformation
+  open NaturalIso
 
+  private
+    variable
+      P Q R : Profunctor I
+
+  π₁ : P × Q ⇒ P
+  π₁ .φ = Prod.proj₁
+  π₁ .naturality = irr[( λ _ _ _ → ≡.refl )] 
+
+  π₂ : P × Q ⇒ Q
+  π₂ .φ = Prod.proj₂
+  π₂ .naturality = irr[( λ _ _ _ → ≡.refl )]
+
+  prod : P ⇒ Q → P ⇒ R → P ⇒ Q × R
+  prod P⇒Q P⇒R .φ = Prod.< P⇒Q .φ , P⇒R .φ >
+  prod P⇒Q P⇒R .naturality =
+    P⇒Q .naturality >>= λ natPQ# →
+    P⇒R .naturality >>= λ natPR# →
+    irr[ (λ f g p → ≡.cong₂ pair (natPQ# f g p) (natPR# f g p) )]
+  
+  ×-swap : P × Q ⇒ Q × P
+  ×-swap .φ = Prod.swap
+  ×-swap .naturality = irr[( λ _ _ _ → ≡.refl )]
+
+  ×-assocʳ : (P × Q) × R ⇒ P × (Q × R)
+  ×-assocʳ .φ = Prod.assocʳ
+  ×-assocʳ .naturality = irr[( λ _ _ _ → ≡.refl )]
+
+  ×-assocˡ : P × (Q × R) ⇒ (P × Q) × R
+  ×-assocˡ .φ = Prod.assocˡ
+  ×-assocˡ .naturality = irr[( λ _ _ _ → ≡.refl )]
+
+  ×-unitˡ : unit × P ⇔ P
+  ×-unitˡ .to = π₂ {P = unit}
+  ×-unitˡ .from = prod bang-unit idNat
+  ×-unitˡ .to-from = irr[( λ _ → ≡.refl )]
+  ×-unitˡ .from-to = irr[( λ _ → ≡.refl )]
+
+  ×-unitʳ : P × unit ⇔ P
+  ×-unitʳ .to = π₁ {Q = unit}
+  ×-unitʳ .from = prod idNat bang-unit
+  ×-unitʳ .to-from = irr[( λ _ → ≡.refl )]
+  ×-unitʳ .from-to = irr[( λ _ → ≡.refl )]
+
+  ×-assoc : (P × Q) × R ⇔ P × (Q × R)
+  ×-assoc {P} {Q} {R} .to = ×-assocʳ {P} {Q} {R}
+  ×-assoc {P} {Q} {R} .from = ×-assocˡ {P} {Q} {R}
+  ×-assoc .to-from = irr[ (λ _ → ≡.refl) ]
+  ×-assoc .from-to = irr[ (λ _ → ≡.refl) ]
+
+  ×-swapIso : P × Q ⇔ Q × P
+  ×-swapIso {P} {Q} .to = ×-swap {P} {Q}
+  ×-swapIso {P} {Q} .from = ×-swap {Q} {P}
+  ×-swapIso .to-from = irr[ (λ _ → ≡.refl) ]
+  ×-swapIso .from-to = irr[ (λ _ → ≡.refl) ]
 
 var : ∀ {I} → I → Profunctor I
 var i = record {
