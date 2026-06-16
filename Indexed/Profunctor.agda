@@ -129,12 +129,17 @@ _∘Nat_ qr pq .naturality =
       (natQR f g (φ pq x))
   )]
 
+-- Pointwise equality between natural transformations
+infix 1 _≈_
+_≈_ : {I : Set} {P Q : Profunctor I} → (P ⇒ Q) → (P ⇒ Q) → Set₁
+_≈_ {P = P} α β = ∀ {a b} (p : P [ a , b ]) → α .φ p ≡ β .φ p
+
 record NaturalIso {I : Set} (P Q : Profunctor I) : Set₁ where
   field
     to : P ⇒ Q
     from : Q ⇒ P
-    to-from : Irrelevant (∀ {a b} (q : Q [ a , b ]) → φ to (φ from q) ≡ q)
-    from-to : Irrelevant (∀ {a b} (p : P [ a , b ]) → φ from (φ to p) ≡ p)
+    to-from : Irrelevant ((to ∘Nat from) ≈ idNat)
+    from-to : Irrelevant ((from ∘Nat to) ≈ idNat)
 
 open NaturalIso
 
@@ -243,7 +248,7 @@ module WithExt .(ext : Extensionality 1ℓ 1ℓ) where
       congNat ≡.refl = ≡.refl
 
     extNat : ∀ {nat1 nat2 : P ⇒ Q}
-      → .(∀ {a b : I → Set} (p : P [ a , b ]) → nat1 .φ p ≡ nat2 .φ p)
+      → .(nat1 ≈ nat2)
       → Irrelevant (nat1 ≡ nat2)
     extNat {nat1 = nat1} {nat2 = nat2} eqφ =
         let .iext : ExtensionalityImplicit 1ℓ 1ℓ
@@ -259,7 +264,7 @@ module WithExt .(ext : Extensionality 1ℓ 1ℓ) where
       congIso ≡.refl ≡.refl = ≡.refl
     
     extIso : ∀ {iso1 iso2 : P ⇔ Q}
-      → .(∀ {a b : I → Set} (p : P [ a , b ]) → iso1 .to .φ p ≡ iso2 .to .φ p)
+      → .(iso1 .to ≈ iso2 .to)
       → Irrelevant (iso1 ≡ iso2)
     extIso {iso1 = iso1} {iso2 = iso2}
         eqTo = irr[ congIso ] <*> extNat eqTo <*> (eqFrom >>= extNat)
@@ -269,7 +274,7 @@ module WithExt .(ext : Extensionality 1ℓ 1ℓ) where
         to2 = iso2 .to .φ
         from2 = iso2 .from .φ
 
-        eqFrom : Irrelevant (∀ {a b : I → Set} (q : Q [ a , b ]) → from1 q ≡ from2 q)
+        eqFrom : Irrelevant (iso1 .from ≈ iso2 .from)
         eqFrom =
           iso1 .to-from >>= λ to1-from1-id →
           iso2 .from-to >>= λ from2-to2-id →
