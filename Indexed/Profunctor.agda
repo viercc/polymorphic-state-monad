@@ -303,7 +303,3 @@ module WithExt .(ext : Extensionality 1ℓ 1ℓ) where
     iso-leftInv : ∀ (iso : P ⇔ Q)
       → Irrelevant (LeftInv (iso .to) (iso .from))
     iso-leftInv iso = iso .from-to >>= extNat
-
--- TODO:
--- 
--- 2. Send (iso)morphisms over index remap

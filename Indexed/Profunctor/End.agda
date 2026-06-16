@@ -264,12 +264,72 @@ module _ {I : Set} {P Q : Profunctor (Maybe I)} where
   End-×-flip .to-from = irr[( λ _ → ≡.refl )]
   End-×-flip .from-to = irr[( λ _ → ≡.refl )]
 
--- 5. End commutes with (fun (k P) _), where k P represents
+-- 5. End can be moved insode (fun (k P) _), where k P represents
 --    a profunctor which does not use "the outermost variable" 
 -- 
---    EndP (fun (k P) Q) ⇔ fun P (EndP Q)
+--      EndP (fun (k P) Q) ⇒ fun P (EndP Q)
 -- 
--- TODO!
+--    The converse direction would require a choice-like principle for
+--    irrelevant proofs:
+--
+--      (∀ p → Irrelevant (R p)) → Irrelevant (∀ p → R p)
+--
+--    This is not available without --irrelevant-projections, and that flag
+--    is non-conservative/unsafe.  Therefore we deliberately do not provide
+--    FunEnd⇒EndFun.
+
+module _ {I : Set} {P : Profunctor I} {Q : Profunctor (Maybe I)} where
+  open Profunctor
+  open NaturalIso
+
+  private
+    -- lemma
+    lmap-on-nothing-fun :
+        (∀ {a* b* : I → Set} (p : P [ a* , b* ]) → dimap P idᵢ idᵢ p ≡ p)
+        → ∀ {a* b* : I → Set} {x x' y : Set} (h : x' → x)
+          (pq : P [ b* , a* ] → Q [ maybe′ a* x , maybe′ b* y ])
+        → ∀ p → lmap (fun (k P) Q) (on-nothing h) pq p ≡ lmap Q (on-nothing h) (pq p)
+    lmap-on-nothing-fun dimap-id-P {x = x} {x' = x'} h pq p =
+      begin
+        lmap (fun (k P) Q) (on-nothing h) pq p
+      ≡⟨⟩
+        (lmap Q (on-nothing h) ∘′ pq ∘′ rmap (k P) {a = maybe′ _ x} (on-nothing h)) p
+      ≡⟨⟩
+        (lmap Q (on-nothing h) ∘′ pq ∘′ rmap P idᵢ) p
+      ≡⟨ ≡.cong (lmap Q (on-nothing h) ∘′ pq) (dimap-id-P p) ⟩
+        lmap Q (on-nothing h) (pq p)
+      ∎
+      where open ≡.≡-Reasoning
+    
+    rmap-on-nothing-fun :
+        (∀ {a* b* : I → Set} (p : P [ a* , b* ]) → dimap P idᵢ idᵢ p ≡ p)
+        → ∀ {a* b* : I → Set} {x y y' : Set} (h : y → y')
+          (pq : P [ b* , a* ] → Q [ maybe′ a* x , maybe′ b* y ])
+        → ∀ p → rmap (fun (k P) Q) (on-nothing h) pq p ≡ rmap Q (on-nothing h) (pq p)
+    rmap-on-nothing-fun dimap-id-P h pq p =
+      -- Reasoning steps are omitted (as they are refl except one step),
+      -- because the proof is almost same for lmap
+      ≡.cong (rmap Q (on-nothing h) ∘′ pq) (dimap-id-P p)
+
+  EndFun⇒FunEnd : EndP (fun (k P) Q) ⇒ fun P (EndP Q)
+  EndFun⇒FunEnd .φ ePQ p .proj x = ePQ .proj x p
+  EndFun⇒FunEnd .φ {a*} {b*} ePQ p .extranaturality =
+    ePQ .extranaturality >>= λ exnat# →
+    dimap-id P >>= λ dimap-id-P# →
+    irr[(λ {x⁻ x⁺} h → begin
+        lmap Q (on-nothing h) (ePQ .proj x⁺ p)
+      ≡⟨ lmap-on-nothing-fun dimap-id-P# h (ePQ .proj x⁺) p ⟨
+        lmap (fun (k P) Q) (on-nothing h) (ePQ .proj x⁺) p
+      ≡⟨ ≡.cong-app (exnat# h) p ⟩
+        rmap (fun (k P) Q) (on-nothing h) (ePQ .proj x⁻) p
+      ≡⟨ rmap-on-nothing-fun dimap-id-P# h (ePQ .proj x⁻) p ⟩
+        rmap Q (on-nothing h) (ePQ .proj x⁻ p)
+      ∎
+    )]
+    where open ≡.≡-Reasoning
+  EndFun⇒FunEnd .naturality = irr[( λ _ _ _ → ≡.refl )]
+
+
 
 -- 6. End commutes with End
 -- 
