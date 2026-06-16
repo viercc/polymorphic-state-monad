@@ -141,13 +141,83 @@ open NaturalIso
 infix 1 NaturalIso
 syntax NaturalIso P Q = P ⇔ Q
 
+idIso : ∀ {I} {P : Profunctor I} → P ⇔ P
+idIso = record {
+    to = idNat; from = idNat;
+    to-from = irr[ (λ _ → ≡.refl) ];
+    from-to = irr[ (λ _ → ≡.refl) ]
+  }
+
+symIso : ∀ {I} {P Q : Profunctor I}
+  → P ⇔ Q → Q ⇔ P
+symIso P⇔Q = record {
+    to = P⇔Q .from;
+    from = P⇔Q .to;
+    to-from = P⇔Q .from-to;
+    from-to = P⇔Q .to-from
+  }
+
+transIso : ∀ {I} {P Q R : Profunctor I}
+  → P ⇔ Q → Q ⇔ R → P ⇔ R
+transIso {_} {P} {Q} {R} P⇔Q Q⇔R = record{
+    to = P⇒R; from = R⇒P;
+    to-from = to-from-PR;
+    from-to = from-to-PR
+  } 
+  where
+    P⇒R : P ⇒ R
+    P⇒R = Q⇔R .to ∘Nat P⇔Q .to
+
+    R⇒P : R ⇒ P
+    R⇒P = P⇔Q .from ∘Nat Q⇔R .from
+
+    open ≡.≡-Reasoning
+
+    to-from-PR : Irrelevant (∀ {a b} (r : R [ a , b ]) → P⇒R .φ (R⇒P .φ r) ≡ r)
+    to-from-PR =
+      P⇔Q .to-from >>= λ to-from-PQ# → 
+      Q⇔R .to-from >>= λ to-from-QR# →
+      irr[( λ {a b} r →
+        begin
+          P⇒R .φ (R⇒P .φ r)
+        ≡⟨⟩
+          Q⇔R .to .φ (P⇔Q .to .φ (P⇔Q .from .φ (Q⇔R .from .φ r)))
+        ≡⟨ ≡.cong (Q⇔R .to .φ) (to-from-PQ# (Q⇔R .from .φ r)) ⟩
+          Q⇔R .to .φ (Q⇔R .from .φ r)
+        ≡⟨ to-from-QR# r ⟩
+          r
+        ∎
+       )]
+
+    from-to-PR : Irrelevant (∀ {a b} (p : P [ a , b ]) → R⇒P .φ (P⇒R .φ p) ≡ p)
+    from-to-PR = 
+      P⇔Q .from-to >>= λ from-to-PQ# → 
+      Q⇔R .from-to >>= λ from-to-QR# →
+      irr[( λ {a b} p →
+        begin
+          R⇒P .φ (P⇒R .φ p)
+        ≡⟨⟩
+          P⇔Q .from .φ (Q⇔R .from .φ (Q⇔R .to .φ (P⇔Q .to .φ p)))
+        ≡⟨ ≡.cong (P⇔Q .from .φ) (from-to-QR# (P⇔Q .to .φ p)) ⟩
+          P⇔Q .from .φ (P⇔Q .to .φ p)
+        ≡⟨ from-to-PQ# p ⟩
+          p
+        ∎
+       )]
+
 -- Given a "≡ on NaturalTransformation" isomorphism proofs,
 -- which are stronger claims than pointwise equalities of φ,
 -- construct a NaturalIso.
+
+RightInv LeftInv : ∀ {I : Set} {P Q : Profunctor I} 
+  → P ⇒ Q → Q ⇒ P → Set _
+RightInv f g = f ∘Nat g ≡ idNat
+LeftInv f g = g ∘Nat f ≡ idNat
+
 naturalIsoBy≡ : ∀ {I : Set} {P Q : Profunctor I}
   (f : P ⇒ Q) (g : Q ⇒ P)
-  → .(f ∘Nat g ≡ idNat)
-  → .(g ∘Nat f ≡ idNat)
+  → .(RightInv f g)
+  → .(LeftInv f g)
   → P ⇔ Q
 naturalIsoBy≡ f g fg≡id gf≡id = 
   record {
@@ -220,14 +290,13 @@ module WithExt .(ext : Extensionality 1ℓ 1ℓ) where
     -- Recovers "≡ on NaturalTransformation"-style isomorphism proofs.
 
     iso-rightInv : ∀ (iso : P ⇔ Q)
-      → Irrelevant (iso .to ∘Nat iso .from ≡ idNat)
+      → Irrelevant (RightInv (iso .to) (iso .from))
     iso-rightInv iso = iso .to-from >>= extNat
     
     iso-leftInv : ∀ (iso : P ⇔ Q)
-      → Irrelevant (iso .from ∘Nat iso .to ≡ idNat)
+      → Irrelevant (LeftInv (iso .to) (iso .from))
     iso-leftInv iso = iso .from-to >>= extNat
 
 -- TODO:
 -- 
--- 1. idIso, _∘Iso_, symIso (refl, trans, and sym respectively)
 -- 2. Send (iso)morphisms over index remap
