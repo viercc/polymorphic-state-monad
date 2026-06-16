@@ -19,8 +19,7 @@ open import Relation.Binary.PropositionalEquality as ≡
 
 open import ExtensionalityUtil
 
--- | Profunctors between (I → Set) and itself,
---   their morphisms and isomorphism.
+-- | Various Profunctor constructions
 module Indexed.Profunctor.Instances where
 
 open import Indexed.Profunctor
@@ -172,17 +171,17 @@ module _ {I : Set} where
       }
     )]
 
-  +-unitˡ : empty + P ⇔ P
-  +-unitˡ .to = either elim-empty idNat
-  +-unitˡ .from = inr {P = empty}
-  +-unitˡ .to-from = irr[( λ _ → ≡.refl )]
-  +-unitˡ .from-to = irr[ Sum.[ (λ ()) , (λ _ → ≡.refl) ] ]
+  +-identityˡ : empty + P ⇔ P
+  +-identityˡ .to = either elim-empty idNat
+  +-identityˡ .from = inr {P = empty}
+  +-identityˡ .to-from = irr[( λ _ → ≡.refl )]
+  +-identityˡ .from-to = irr[ Sum.[ (λ ()) , (λ _ → ≡.refl) ] ]
 
-  +-unitʳ : P + empty ⇔ P
-  +-unitʳ .to = either idNat elim-empty
-  +-unitʳ .from = inl {Q = empty}
-  +-unitʳ .to-from = irr[( λ _ → ≡.refl )]
-  +-unitʳ .from-to = irr[ Sum.[ (λ _ → ≡.refl), (λ ()) ] ] 
+  +-identityʳ : P + empty ⇔ P
+  +-identityʳ .to = either idNat elim-empty
+  +-identityʳ .from = inl {Q = empty}
+  +-identityʳ .to-from = irr[( λ _ → ≡.refl )]
+  +-identityʳ .from-to = irr[ Sum.[ (λ _ → ≡.refl), (λ ()) ] ] 
 
   +-assoc : (P + Q) + R ⇔ P + (Q + R)
   +-assoc {P} {Q} {R} .to = +-assocʳ {P} {Q} {R}
@@ -275,17 +274,17 @@ module _ {I : Set} where
   ×-assocˡ .φ = Prod.assocˡ
   ×-assocˡ .naturality = irr[( λ _ _ _ → ≡.refl )]
 
-  ×-unitˡ : unit × P ⇔ P
-  ×-unitˡ .to = π₂ {P = unit}
-  ×-unitˡ .from = prod bang-unit idNat
-  ×-unitˡ .to-from = irr[( λ _ → ≡.refl )]
-  ×-unitˡ .from-to = irr[( λ _ → ≡.refl )]
+  ×-identityˡ : unit × P ⇔ P
+  ×-identityˡ .to = π₂ {P = unit}
+  ×-identityˡ .from = prod bang-unit idNat
+  ×-identityˡ .to-from = irr[( λ _ → ≡.refl )]
+  ×-identityˡ .from-to = irr[( λ _ → ≡.refl )]
 
-  ×-unitʳ : P × unit ⇔ P
-  ×-unitʳ .to = π₁ {Q = unit}
-  ×-unitʳ .from = prod idNat bang-unit
-  ×-unitʳ .to-from = irr[( λ _ → ≡.refl )]
-  ×-unitʳ .from-to = irr[( λ _ → ≡.refl )]
+  ×-identityʳ : P × unit ⇔ P
+  ×-identityʳ .to = π₁ {Q = unit}
+  ×-identityʳ .from = prod idNat bang-unit
+  ×-identityʳ .to-from = irr[( λ _ → ≡.refl )]
+  ×-identityʳ .from-to = irr[( λ _ → ≡.refl )]
 
   ×-assoc : (P × Q) × R ⇔ P × (Q × R)
   ×-assoc {P} {Q} {R} .to = ×-assocʳ {P} {Q} {R}
