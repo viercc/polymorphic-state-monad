@@ -363,13 +363,12 @@ module InstancesWithExt .(ext : Extensionality 1ℓ 1ℓ) where
 -- 
 -- 1. Profunctor "behaves like" Set on sum, product, fun.
 -- 
---    - _+_ is monoidal (with unit = constant ⊥)
---    - _×_ is monoidal (with unit = constant ⊤)
---    - _×_ distributes over _+_
---    - Adjunction (_× P) ⊣ (fun P)
---      - currying, uncurrying, evaluation, coevaluation
--- 
---    All up to iso (_⇔_)
+--    - [x] _+_ is monoidal (with unit = constant ⊥)
+--    - [x] _×_ is monoidal (with unit = constant ⊤)
+--    - [_] _×_ distributes over _+_
+--    - [_] Adjunction (_× P) ⊣ (fun P)
+--      - currying, uncurrying (, evaluation, coevaluation)
+--      - fun (P + Q) R ⇔ fun P R × fun Q R
 
 private
   module examples .(ext : Extensionality 1ℓ 1ℓ) where
