@@ -28,6 +28,8 @@ open WithExt ext
 open import Indexed.Profunctor.Instances
 open InstancesWithExt ext
 
+open import Indexed.Profunctor.Functor
+
 private
   lower-ext₀₀ : Extensionality 1ℓ 1ℓ → Extensionality 0ℓ 0ℓ
   lower-ext₀₀ = lower-extensionality 1ℓ 1ℓ
@@ -203,62 +205,31 @@ module _ {I : Set} where
         naturality# (on-just f) (on-just g) (eP .proj x)
       )]
 
-  mapEnd-id : ∀ {P}
-    → Irrelevant (mapEnd (idNat {P = P}) ≡ idNat)
-  mapEnd-id = extNat λ _ → ≡.refl
+  mapEnd-cong : ∀ {P Q} {α β : P ⇒ Q}
+    → .(α ≈ β)
+    → Irrelevant (mapEnd α ≈ mapEnd β)
+  mapEnd-cong {Q = Q} eq = irr[( λ eP → extEnd Q ext λ x → eq (eP .proj x) )]
+
+  mapEnd-id : ∀ (P : Profunctor (Maybe I))
+    → Irrelevant (mapEnd (idNat {P = P}) ≈ idNat)
+  mapEnd-id _ = irr[( λ _ → ≡.refl )]
 
   mapEnd-∘ : ∀ {P Q R}
     → (natQR : Q ⇒ R) → (natPQ : P ⇒ Q)
-    → Irrelevant (mapEnd (natQR ∘Nat natPQ) ≡ mapEnd natQR ∘Nat mapEnd natPQ)
-  mapEnd-∘ natQR natPQ = extNat λ _ → ≡.refl
+    → Irrelevant (mapEnd (natQR ∘Nat natPQ) ≈ mapEnd natQR ∘Nat mapEnd natPQ)
+  mapEnd-∘ natQR natPQ = irr[( λ _ → ≡.refl )]
 
-  module _ {P Q : Profunctor (Maybe I)} where
-    open NaturalIso
+  instance
+    EndP-isFunctor : IsFunctor (Maybe I) I EndP
+    EndP-isFunctor = record {
+        promap = mapEnd;
+        promap-cong = λ {P Q} {α β : P ⇒ Q} → mapEnd-cong {α = α} {β = β};
+        promap-id = mapEnd-id;
+        promap-∘ = mapEnd-∘
+      }
 
-    map-rightInv : (iso : P ⇔ Q)
-      → Irrelevant (mapEnd (iso .to) ∘Nat mapEnd (iso .from) ≡ idNat)
-    map-rightInv iso =
-      iso-rightInv iso >>= λ rightInv# →
-      mapEnd-id >>= λ map-id# →
-      mapEnd-∘ (iso .to) (iso .from) >>= λ map-∘# →
-      irr[(
-        begin
-          mapEnd (iso .to) ∘Nat mapEnd (iso .from)
-        ≡⟨ map-∘# ⟨
-          mapEnd (iso .to ∘Nat iso .from)
-        ≡⟨ ≡.cong mapEnd rightInv# ⟩
-          mapEnd idNat
-        ≡⟨ map-id# ⟩
-          idNat
-        ∎
-      )]
-      where open ≡.≡-Reasoning
-
-    map-leftInv : (iso : P ⇔ Q)
-      → Irrelevant (mapEnd (iso .from) ∘Nat mapEnd (iso .to) ≡ idNat)
-    map-leftInv iso =
-      iso-leftInv iso >>= λ leftInv# →
-      mapEnd-id >>= λ map-id# →
-      mapEnd-∘ (iso .from) (iso .to) >>= λ map-∘# →
-      irr[(
-        begin
-          mapEnd (iso .from) ∘Nat mapEnd (iso .to)
-        ≡⟨ map-∘# ⟨
-          mapEnd (iso .from ∘Nat iso .to)
-        ≡⟨ ≡.cong mapEnd leftInv# ⟩
-          mapEnd idNat
-        ≡⟨ map-id# ⟩
-          idNat
-        ∎
-      )]
-      where open ≡.≡-Reasoning
-    
-    mapEndIso : (P ⇔ Q) → (EndP P ⇔ EndP Q)
-    mapEndIso iso =
-      let irr[ leftInv# ] = map-leftInv iso
-          irr[ rightInv# ] = map-rightInv iso
-      in naturalIsoBy≡ (mapEnd (iso .to)) (mapEnd (iso .from))
-           rightInv# leftInv#
+  mapEndIso : ∀ {P Q} → (P ⇔ Q) → (EndP P ⇔ EndP Q)
+  mapEndIso iso = promapIso EndP iso
 
 -- 4. End commutes with ×
 --    EndP (P × Q) ⇔ EndP P × EndP Q
@@ -269,16 +240,29 @@ module _ {I : Set} {P Q : Profunctor (Maybe I)} where
 
   private
     End×⇒Fst : EndP (P × Q) ⇒ EndP P
-    End×⇒Fst = _
+    End×⇒Fst = mapEnd (π₁ {Q = Q})
 
     End×⇒Snd : EndP (P × Q) ⇒ EndP Q
-    End×⇒Snd = _
+    End×⇒Snd = mapEnd (π₂ {P = P})
 
     End×⇒×End : EndP (P × Q) ⇒ EndP P × EndP Q
-    End×⇒×End = _
+    End×⇒×End = prod End×⇒Fst End×⇒Snd
 
     ×End⇒End× : (EndP P × EndP Q) ⇒ EndP (P × Q)
-    ×End⇒End× = _
+    ×End⇒End× .φ (pair eP eQ) .proj x = pair (eP .proj x) (eQ .proj x)
+    ×End⇒End× .φ (pair eP eQ) .extranaturality =
+      eP .extranaturality >>= λ exnatP# →
+      eQ .extranaturality >>= λ exnatQ# →
+      irr[(
+        λ h → ≡.cong₂ pair (exnatP# h) (exnatQ# h)
+      )]
+    ×End⇒End× .naturality = irr[( λ _ _ _ → ≡.refl )]
+
+  End-×-flip : EndP (P × Q) ⇔ EndP P × EndP Q
+  End-×-flip .to = End×⇒×End
+  End-×-flip .from = ×End⇒End×
+  End-×-flip .to-from = irr[( λ _ → ≡.refl )]
+  End-×-flip .from-to = irr[( λ _ → ≡.refl )]
 
 -- 5. End commutes with (fun (k P) _), where k P represents
 --    a profunctor which does not use "the outermost variable" 
@@ -287,7 +271,7 @@ module _ {I : Set} {P Q : Profunctor (Maybe I)} where
 -- 
 -- 6. End commutes with End
 -- 
---    EndP (EndP P) ⇔ EndP (EndP (σ ⋆ P))
+--    EndP (EndP P) ⇔ EndP (EndP (mapIndex σ P))
 --   
 --    where σ : Maybe (Maybe I) → Maybe (Maybe I)
 --    is the "swap two nothings" isomorphism
