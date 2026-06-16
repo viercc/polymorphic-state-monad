@@ -210,9 +210,11 @@ transIso {_} {P} {Q} {R} P⇔Q Q⇔R = record{
         ∎
        )]
 
--- Given a "≡ on NaturalTransformation" isomorphism proofs,
--- which are stronger claims than pointwise equalities of φ,
+-- Given a "≡ on NaturalTransformation" isomorphism proof,
 -- construct a NaturalIso.
+-- 
+-- It is a stronger claim than pointwise equalities ≈ required for
+-- NaturalIso.
 
 RightInv LeftInv : ∀ {I : Set} {P Q : Profunctor I} 
   → P ⇒ Q → Q ⇒ P → Set _

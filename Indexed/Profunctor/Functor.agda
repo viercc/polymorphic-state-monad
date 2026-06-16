@@ -54,7 +54,7 @@ module _ {I J : Set} {t : I → J} where
     mapIndexIsFunctor .promap-id _ = irr[( λ _ → ≡.refl )]
     mapIndexIsFunctor .promap-∘ _ _ = irr[( λ _ → ≡.refl )]
 
--- Profunctor Functor preserve NaturalIso
+-- Profunctor Functor preserves NaturalIso
 module _ {I J : Set} where
   open NaturalIso
 

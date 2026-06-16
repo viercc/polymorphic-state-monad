@@ -19,8 +19,10 @@ open import Relation.Binary.PropositionalEquality as ≡
 
 open import ExtensionalityUtil
 
--- | Profunctors between (I → Set) and itself,
---   their morphisms and isomorphism.
+-- | (One-parameter) End of a Profunctor.
+--   
+--   Sends Profunctor (Maybe I) to Profunctor I
+--   which has been "quotiented away" one parameter.
 module Indexed.Profunctor.End .(ext : Extensionality 1ℓ 1ℓ) where
 
 open import Indexed.Profunctor
@@ -59,7 +61,7 @@ private
         → ∀ mi → on-just {x = y} (f ∘ᵢ g) mi ≡ (on-just f ∘ᵢ on-just g) mi
   on-just-∘ _ _ = λ { (just _) → ≡.refl; nothing → ≡.refl }
 
--- * (one-variable) End of a Profunctor
+-- * One-parameter End of a Profunctor
 
 module _ {I : Set} (P : Profunctor (Maybe I)) where
   open Profunctor P
@@ -90,7 +92,7 @@ module _ {I : Set} (P : Profunctor (Maybe I)) where
   -- Equality between (p₁ p₂ : End P a b)
   -- can be proven from their contents' pointwise equality.
   -- (uses extensionality for pointwise to function itself,
-  --  then uses irrelevance of extranaturality) 
+  --  then uses irrelevance of extranaturality)
   extEnd : Extensionality 1ℓ 1ℓ
     → ∀ {a b : I → Set} {p₁ p₂ : End a b}
     → (∀ (x : Set) → p₁ .proj x ≡ p₂ .proj x)
@@ -170,16 +172,11 @@ module _ {I : Set} (P : Profunctor (Maybe I)) where
   EndP .dimap-id = dimapEnd-id
   EndP .dimap-∘ = dimapEnd-∘
 
--- TODO:
--- 
--- 1. mapping natural transformation over End:
---   (P ⇒ Q) → (EndP P ⇒ EndP Q)
--- 2. The mapping is functorial
--- 3. The mapping preserves Iso (immediate from 2. but things can be tedious)
-
 module _ {I : Set} where
   open Profunctor
 
+  -- 1. mapping natural transformation over End:
+  --   (P ⇒ Q) → (EndP P ⇒ EndP Q)
   module _ {P Q : Profunctor (Maybe I)} where
     mapEnd : (P ⇒ Q) -> (EndP P ⇒ EndP Q)
     mapEnd nat .φ eP .proj x = nat .φ (eP .proj x)
@@ -205,6 +202,8 @@ module _ {I : Set} where
         naturality# (on-just f) (on-just g) (eP .proj x)
       )]
 
+  -- 2. The mapping is functorial
+
   mapEnd-cong : ∀ {P Q} {α β : P ⇒ Q}
     → .(α ≈ β)
     → Irrelevant (mapEnd α ≈ mapEnd β)
@@ -228,12 +227,13 @@ module _ {I : Set} where
         promap-∘ = mapEnd-∘
       }
 
+  -- 3. The mapping preserves Iso
+
   mapEndIso : ∀ {P Q} → (P ⇔ Q) → (EndP P ⇔ EndP Q)
   mapEndIso iso = promapIso EndP iso
 
 -- 4. End commutes with ×
 --    EndP (P × Q) ⇔ EndP P × EndP Q
--- 
 module _ {I : Set} {P Q : Profunctor (Maybe I)} where
   open Profunctor
   open NaturalIso
@@ -269,12 +269,16 @@ module _ {I : Set} {P Q : Profunctor (Maybe I)} where
 -- 
 --    EndP (fun (k P) Q) ⇔ fun P (EndP Q)
 -- 
+-- TODO!
+
 -- 6. End commutes with End
 -- 
 --    EndP (EndP P) ⇔ EndP (EndP (mapIndex σ P))
---   
+--    
 --    where σ : Maybe (Maybe I) → Maybe (Maybe I)
 --    is the "swap two nothings" isomorphism
+-- 
+-- TODO!
 
 private
   -- Example usage
