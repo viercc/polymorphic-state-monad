@@ -25,11 +25,11 @@ open import Indexed.Profunctor.Functor
 module Indexed.Profunctor.Sum where
 
 private
+  -- Sum.map has universe-level-polymorphic type
+  -- and they didn't inferred when used directly
   mapSum : ∀ {A B C D : Set₁} → (A → C) → (B → D)
     → A ⊎ B → C ⊎ D
   mapSum = Sum.map
-    -- Sum.map has universe-level-polymorphic type
-    -- and they didn't inferred when used directly
 
   mapSum-id : ∀ {A B} x → mapSum (id {A = A}) (id {A = B}) x ≡ x
   mapSum-id = Sum.[ (λ _ → ≡.refl) , (λ _ → ≡.refl) ]

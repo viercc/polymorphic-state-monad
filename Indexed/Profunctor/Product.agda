@@ -24,37 +24,78 @@ open import Indexed.Profunctor.Functor
 -- | Product of Profunctors
 module Indexed.Profunctor.Product where
 
-module _ where
+private
+  -- Prod.map has universe-level-polymorphic type
+  -- and they didn't inferred when used directly
+  mapProd : ∀ {A B C D : Set₁} → (A → C) → (B → D)
+    → A Prod.× B → C Prod.× D
+  mapProd f g = Prod.map f g
+
+infixr 3 _×_
+
+_×_ : ∀ {I} → Profunctor I → Profunctor I → Profunctor I
+_×_ {I} P Q =
+  record {
+    Carrier = λ a b → P [ a , b ] Prod.× Q [ a , b ];
+    dimap = λ f g → mapProd (dimap P f g) (dimap Q f g);
+    dimap-id = 
+      dimap-id P >>= λ dimap-id-P →
+      dimap-id Q >>= λ dimap-id-Q →
+      irr[( λ (pair x₁ x₂) →
+        ≡.cong₂ pair (dimap-id-P x₁) (dimap-id-Q x₂)
+      )];
+    dimap-∘ = 
+      dimap-∘ P >>= λ dimap-∘-P →
+      dimap-∘ Q >>= λ dimap-∘-Q →
+      irr[( λ f₁ g₁ f₂ g₂ (pair x₁ x₂) →
+        let eqP = dimap-∘-P f₁ g₁ f₂ g₂ x₁
+            eqQ = dimap-∘-Q f₁ g₁ f₂ g₂ x₂
+        in ≡.cong₂ Prod._,_ eqP eqQ 
+      )]
+  }
+  where
+    open Profunctor
+
+-- Functoriality
+module _ {I : Set} where
   private
-    map× : ∀ {A B C D : Set₁} → (A → C) → (B → D)
-      → A Prod.× B → C Prod.× D
-    map× f g = Prod.map f g
-
-  infixr 3 _×_
-
-  _×_ : ∀ {I} → Profunctor I → Profunctor I → Profunctor I
-  _×_ {I} P Q =
-    record {
-      Carrier = λ a b → P [ a , b ] Prod.× Q [ a , b ];
-      dimap = λ f g → map× (dimap P f g) (dimap Q f g);
-      dimap-id = 
-        dimap-id P >>= λ dimap-id-P →
-        dimap-id Q >>= λ dimap-id-Q →
-        irr[( λ (pair x₁ x₂) →
-          ≡.cong₂ pair (dimap-id-P x₁) (dimap-id-Q x₂)
-        )];
-      dimap-∘ = 
-        dimap-∘ P >>= λ dimap-∘-P →
-        dimap-∘ Q >>= λ dimap-∘-Q →
-        irr[( λ f₁ g₁ f₂ g₂ (pair x₁ x₂) →
-          let eqP = dimap-∘-P f₁ g₁ f₂ g₂ x₁
-              eqQ = dimap-∘-Q f₁ g₁ f₂ g₂ x₂
-          in ≡.cong₂ Prod._,_ eqP eqQ 
-        )]
-    }
-    where
-      open Profunctor
+    variable
+      P₁ P₂ Q₁ Q₂ R₁ R₂ : Profunctor I
   
+  map× : (P₁ ⇒ Q₁) → (P₂ ⇒ Q₂) → (P₁ × P₂) ⇒ (Q₁ × Q₂)
+  map× α₁ α₂ .φ = mapProd (α₁ .φ) (α₂ .φ)
+  map× α₁ α₂ .naturality =
+    α₁ .naturality >>= λ nat₁# →
+    α₂ .naturality >>= λ nat₂# →
+    irr[( λ f g (pair p₁ p₂) →
+      ≡.cong₂ pair (nat₁# f g p₁) (nat₂# f g p₂)
+    )]
+   
+  map×-cong : ∀ {α₁ β₁ : P₁ ⇒ Q₁} {α₂ β₂ : P₂ ⇒ Q₂}
+    → .(α₁ ≈ β₁) → .(α₂ ≈ β₂)
+    → Irrelevant (map× α₁ α₂ ≈ map× β₁ β₂)
+  map×-cong eq₁ eq₂ = irr[( λ (pair p₁ p₂) → ≡.cong₂ pair (eq₁ p₁) (eq₂ p₂) )]
+
+  map×-id : (P Q : Profunctor I)
+    → Irrelevant (map× (idNat {P = P}) (idNat {P = Q}) ≈ idNat)
+  map×-id _ _ = irr[ (λ _ → ≡.refl ) ]
+
+  map×-∘ : ∀
+    (qr₁ : Q₁ ⇒ R₁) (qr₂ : Q₂ ⇒ R₂) (pq₁ : P₁ ⇒ Q₁) (pq₂ : P₂ ⇒ Q₂)
+    → Irrelevant (map× (qr₁ ∘Nat pq₁) (qr₂ ∘Nat pq₂) ≈ map× qr₁ qr₂ ∘Nat map× pq₁ pq₂)
+  map×-∘ _ _ _ _ = irr[ (λ _ → ≡.refl) ]
+
+  open IsFunctor
+
+  instance
+    -- Functorial on the second component
+    ×-isFunctor : ∀ {A : Profunctor I} → IsFunctor I I (A ×_)
+    ×-isFunctor {A} .promap pq = map× {P₁ = A} {Q₁ = A} idNat pq
+    ×-isFunctor {A} .promap-cong {α = α} {β = β} =
+      map×-cong {P₁ = A} {α₁ = idNat} {β₁ = idNat} {α₂ = α} {β₂ = β} (λ _ → ≡.refl)
+    ×-isFunctor {A} .promap-id = map×-id A
+    ×-isFunctor {A} .promap-∘ pq qr = map×-∘ (idNat {P = A}) pq (idNat {P = A}) qr
+
 module _ {I : Set} where
   open Profunctor
   open NaturalTransformation
