@@ -24,68 +24,109 @@ open import Indexed.Profunctor.Functor
 -- | Sum of profunctors
 module Indexed.Profunctor.Sum where
 
-module _ where
+private
+  mapSum : ∀ {A B C D : Set₁} → (A → C) → (B → D)
+    → A ⊎ B → C ⊎ D
+  mapSum = Sum.map
+    -- Sum.map has universe-level-polymorphic type
+    -- and they didn't inferred when used directly
 
+  mapSum-id : ∀ {A B} x → mapSum (id {A = A}) (id {A = B}) x ≡ x
+  mapSum-id = Sum.[ (λ _ → ≡.refl) , (λ _ → ≡.refl) ]
+
+  mapSum-cong : ∀ {A B C D : Set₁} 
+    {f₁ f₂ : A → C} {g₁ g₂ : B → D}
+    → f₁ ≗ f₂ → g₁ ≗ g₂ → mapSum f₁ g₁ ≗ mapSum f₂ g₂
+  mapSum-cong feq _ (Sum.inj₁ x₁) = ≡.cong Sum.inj₁ (feq x₁)
+  mapSum-cong _ geq (Sum.inj₂ x₂) = ≡.cong Sum.inj₂ (geq x₂)
+
+  mapSum-∘ : ∀ {A B C D E F}
+    (h₁ : C → E) (j₁ : D → F) (h₂ : A → C) (j₂ : B → D)
+    → ∀ x → mapSum (h₁ ∘′ h₂) (j₁ ∘′ j₂) x ≡ mapSum h₁ j₁ (mapSum h₂ j₂ x)
+  mapSum-∘ _ _ _ _ = Sum.[ (λ _ → ≡.refl) , (λ _ → ≡.refl) ]
+
+infixr 2 _+_
+
+_+_ : ∀ {I} → Profunctor I → Profunctor I → Profunctor I
+_+_ {I} P Q =
+  record {
+    Carrier = λ a b → P [ a , b ] ⊎ Q [ a , b ];
+    dimap = λ f g → mapSum (dimap P f g) (dimap Q f g);
+    dimap-id =
+      dimap-id P >>= λ dimap-id-P →
+      dimap-id Q >>= λ dimap-id-Q →
+      irr[( λ x →
+        begin
+          mapSum (dimap P idᵢ idᵢ) (dimap Q idᵢ idᵢ) x
+        ≡⟨ mapSum-cong dimap-id-P dimap-id-Q x ⟩
+          mapSum id id x
+        ≡⟨ mapSum-id x ⟩
+          x
+        ∎
+      )] ;
+    dimap-∘ =
+      dimap-∘ P >>= λ dimap-∘-P →
+      dimap-∘ Q >>= λ dimap-∘-Q →
+      irr[( λ f₁ g₁ f₂ g₂ x →
+      let eqP = dimap-∘-P f₁ g₁ f₂ g₂
+          eqQ = dimap-∘-Q f₁ g₁ f₂ g₂
+      in
+        begin
+          mapSum (dimap P (f₂ ∘ᵢ f₁) (g₁ ∘ᵢ g₂)) (dimap Q (f₂ ∘ᵢ f₁) (g₁ ∘ᵢ g₂)) x
+        ≡⟨ mapSum-cong eqP eqQ x ⟩
+          mapSum (dimap P f₁ g₁ ∘′ dimap P f₂ g₂) (dimap Q f₁ g₁ ∘′ dimap Q f₂ g₂) x
+        ≡⟨ mapSum-∘ _ _ _ _ x ⟩
+          mapSum (dimap P f₁ g₁) (dimap Q f₁ g₁) (mapSum (dimap P f₂ g₂) (dimap Q f₂ g₂) x)
+        ∎
+    )]
+  }
+  where
+    open Profunctor
+    open ≡.≡-Reasoning
+
+-- Functoriality
+module _ {I : Set} where
   private
-    map+ : ∀ {A B C D : Set₁} → (A → C) → (B → D)
-      → A ⊎ B → C ⊎ D
-    map+ f g = Sum.map f g
+    variable
+      P₁ P₂ Q₁ Q₂ R₁ R₂ : Profunctor I
+  
+  map+ : (P₁ ⇒ Q₁) → (P₂ ⇒ Q₂) → (P₁ + P₂) ⇒ (Q₁ + Q₂)
+  map+ α₁ α₂ .φ = mapSum (α₁ .φ) (α₂ .φ)
+  map+ α₁ α₂ .naturality =
+    α₁ .naturality >>= λ nat₁# →
+    α₂ .naturality >>= λ nat₂# →
+    irr[( λ f g → λ {
+        (Sum.inj₁ p₁) → ≡.cong Sum.inj₁ (nat₁# f g p₁);
+        (Sum.inj₂ p₂) → ≡.cong Sum.inj₂ (nat₂# f g p₂)
+      }
+    )]
+   
+  map+-cong : ∀ {α₁ β₁ : P₁ ⇒ Q₁} {α₂ β₂ : P₂ ⇒ Q₂}
+    → .(α₁ ≈ β₁) → .(α₂ ≈ β₂)
+    → Irrelevant (map+ α₁ α₂ ≈ map+ β₁ β₂)
+  map+-cong eq₁ eq₂ = irr[ mapSum-cong eq₁ eq₂ ]
 
-    map+-id : ∀ {A B} x → map+ (id {A = A}) (id {A = B}) x ≡ x
-    map+-id (Sum.inj₁ x₁) = ≡.refl
-    map+-id (Sum.inj₂ x₂) = ≡.refl
+  map+-id : (P Q : Profunctor I)
+    → Irrelevant (map+ (idNat {P = P}) (idNat {P = Q}) ≈ idNat)
+  map+-id _ _ = irr[ mapSum-id ]
 
-    map+-cong : ∀ {A B C D : Set₁} 
-      {f₁ f₂ : A → C} {g₁ g₂ : B → D}
-      → f₁ ≗ f₂ → g₁ ≗ g₂ → map+ f₁ g₁ ≗ map+ f₂ g₂
-    map+-cong feq _ (Sum.inj₁ x₁) = ≡.cong Sum.inj₁ (feq x₁)
-    map+-cong _ geq (Sum.inj₂ x₂) = ≡.cong Sum.inj₂ (geq x₂)
+  map+-∘ : ∀
+    (qr₁ : Q₁ ⇒ R₁) (qr₂ : Q₂ ⇒ R₂) (pq₁ : P₁ ⇒ Q₁) (pq₂ : P₂ ⇒ Q₂)
+    → Irrelevant (map+ (qr₁ ∘Nat pq₁) (qr₂ ∘Nat pq₂) ≈ map+ qr₁ qr₂ ∘Nat map+ pq₁ pq₂)
+  map+-∘ _ _ _ _ = irr[ mapSum-∘ _ _ _ _ ]
 
-    map+-∘ : ∀ {A B C D E F}
-      (h₁ : C → E) (j₁ : D → F) (h₂ : A → C) (j₂ : B → D)
-      → ∀ x → map+ (h₁ ∘′ h₂) (j₁ ∘′ j₂) x ≡ map+ h₁ j₁ (map+ h₂ j₂ x)
-    map+-∘ _ _ _ _ (Sum.inj₁ _) = ≡.refl
-    map+-∘ _ _ _ _ (Sum.inj₂ _) = ≡.refl
+  open IsFunctor
 
-  infixr 2 _+_
+  instance
+    -- Functorial on the second component
+    +-isFunctor : ∀ {A : Profunctor I} → IsFunctor I I (A +_)
+    +-isFunctor {A} .promap pq = map+ {P₁ = A} {Q₁ = A} idNat pq
+    +-isFunctor {A} .promap-cong {α = α} {β = β} =
+      map+-cong {P₁ = A} {α₁ = idNat} {β₁ = idNat} {α₂ = α} {β₂ = β} (λ _ → ≡.refl)
+    +-isFunctor {A} .promap-id = map+-id A
+    +-isFunctor {A} .promap-∘ pq qr = map+-∘ (idNat {P = A}) pq (idNat {P = A}) qr
 
-  _+_ : ∀ {I} → Profunctor I → Profunctor I → Profunctor I
-  _+_ {I} P Q =
-    record {
-      Carrier = λ a b → P [ a , b ] ⊎ Q [ a , b ];
-      dimap = λ f g → map+ (dimap P f g) (dimap Q f g);
-      dimap-id =
-        dimap-id P >>= λ dimap-id-P →
-        dimap-id Q >>= λ dimap-id-Q →
-        irr[( λ x →
-          begin
-            map+ (dimap P idᵢ idᵢ) (dimap Q idᵢ idᵢ) x
-          ≡⟨ map+-cong dimap-id-P dimap-id-Q x ⟩
-            map+ id id x
-          ≡⟨ map+-id x ⟩
-            x
-          ∎
-        )] ;
-      dimap-∘ =
-        dimap-∘ P >>= λ dimap-∘-P →
-        dimap-∘ Q >>= λ dimap-∘-Q →
-        irr[( λ f₁ g₁ f₂ g₂ x →
-        let eqP = dimap-∘-P f₁ g₁ f₂ g₂
-            eqQ = dimap-∘-Q f₁ g₁ f₂ g₂
-        in
-          begin
-            map+ (dimap P (f₂ ∘ᵢ f₁) (g₁ ∘ᵢ g₂)) (dimap Q (f₂ ∘ᵢ f₁) (g₁ ∘ᵢ g₂)) x
-          ≡⟨ map+-cong eqP eqQ x ⟩
-            map+ (dimap P f₁ g₁ ∘′ dimap P f₂ g₂) (dimap Q f₁ g₁ ∘′ dimap Q f₂ g₂) x
-          ≡⟨ map+-∘ _ _ _ _ x ⟩
-            map+ (dimap P f₁ g₁) (dimap Q f₁ g₁) (map+ (dimap P f₂ g₂) (dimap Q f₂ g₂) x)
-          ∎
-      )]
-    }
-    where
-      open Profunctor
-      open ≡.≡-Reasoning
-
+-- Properties of Sum
 module _ {I : Set} where
   open NaturalTransformation
   open NaturalIso
