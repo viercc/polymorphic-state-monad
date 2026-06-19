@@ -238,6 +238,66 @@ naturalIsoBy≡ f g fg≡id gf≡id =
     )]
   }
 
+-- * Simple instances
+
+hom : ∀ {I} → Profunctor I
+hom = record {
+    Carrier = λ a b → Lift 1ℓ (∀ i → a i → b i);
+    dimap = λ f g (lift p) → lift (g ∘ᵢ p ∘ᵢ f);
+    dimap-id = irr[( λ _ → ≡.refl )];
+    dimap-∘ = irr[( λ _ _ _ _ _ → ≡.refl )]
+  }
+
+-- constant profunctor
+constant : ∀ {I} → (c : Set) → Profunctor I
+constant c = record {
+    Carrier = λ _ _ → Lift 1ℓ c;
+    dimap = λ _ _ p → p;
+    dimap-id = irr[( λ _ → ≡.refl )];
+    dimap-∘ = irr[( λ _ _ _ _ _ → ≡.refl )]
+  }
+
+-- * Initial and terminal profunctors
+
+empty unit : ∀ {I} → Profunctor I
+empty = constant ⊥
+unit = constant ⊤
+
+elim-empty : ∀ {I} {P : Profunctor I}
+  → empty ⇒ P
+elim-empty .φ = λ ()
+elim-empty .naturality = irr[( λ _ _ () )]
+
+elim-empty-univ : ∀ {I} {P : Profunctor I}
+  → ∀ (elim' : empty ⇒ P) → elim' ≈ elim-empty
+elim-empty-univ _ = λ ()
+
+bang-unit : ∀ {I} {P : Profunctor I}
+  → P ⇒ unit
+bang-unit .φ = λ _ → lift tt
+bang-unit .naturality = irr[( λ _ _ _ → ≡.refl )]
+
+bang-unit-univ : ∀ {I} {P : Profunctor I}
+  → ∀ (bang' : P ⇒ unit) → bang' ≈ bang-unit
+bang-unit-univ _ = λ _ → ≡.refl
+
+-- * Variables
+
+var : ∀ {I} → I → Profunctor I
+var i = record {
+    Carrier = λ _ b → Lift 1ℓ (b i);
+    dimap = λ _ g p → lift (g i (lower p)) ;
+    dimap-id = irr[( λ _ → ≡.refl )];
+    dimap-∘ = irr[( λ _ _ _ _ _ → ≡.refl )]
+  }
+
+v0 : ∀ {I} → Profunctor (Maybe I)
+v0 = var nothing
+
+k : ∀ {I} → Profunctor I → Profunctor (Maybe I)
+k = mapIndex just
+
+
 -- Theorems depending on function extensionality.
 -- The supplied extensionality is marked irrelevant,
 -- so that its use is restricted to irrelevant contexts.

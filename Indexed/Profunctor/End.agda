@@ -27,10 +27,10 @@ module Indexed.Profunctor.End .(ext : Extensionality 1ℓ 1ℓ) where
 
 open import Indexed.Profunctor
 open WithExt ext
-open import Indexed.Profunctor.Instances
-open InstancesWithExt ext
-
 open import Indexed.Profunctor.Functor
+
+open import Indexed.Profunctor.Product
+open import Indexed.Profunctor.Fun ext
 
 private
   lower-ext₀₀ : Extensionality 1ℓ 1ℓ → Extensionality 0ℓ 0ℓ
