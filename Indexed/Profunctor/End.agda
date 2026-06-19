@@ -23,7 +23,7 @@ open import ExtensionalityUtil
 --   
 --   Sends Profunctor (Maybe I) to Profunctor I
 --   which has been "quotiented away" one parameter.
-module Indexed.Profunctor.End .(ext : Extensionality 1ℓ 1ℓ) where
+module Indexed.Profunctor.End (ext : Extensionality 1ℓ 1ℓ) where
 
 open import Indexed.Profunctor
 open WithExt ext
@@ -33,8 +33,8 @@ open import Indexed.Profunctor.Product
 open import Indexed.Profunctor.Fun ext
 
 private
-  lower-ext₀₀ : Extensionality 1ℓ 1ℓ → Extensionality 0ℓ 0ℓ
-  lower-ext₀₀ = lower-extensionality 1ℓ 1ℓ
+  ext₀₀ : Extensionality 0ℓ 0ℓ
+  ext₀₀ = lower-extensionality 1ℓ 1ℓ ext
 
 -- * Preliminary definitions
 
@@ -93,75 +93,63 @@ module _ {I : Set} (P : Profunctor (Maybe I)) where
   -- can be proven from their contents' pointwise equality.
   -- (uses extensionality for pointwise to function itself,
   --  then uses irrelevance of extranaturality)
-  extEnd : Extensionality 1ℓ 1ℓ
-    → ∀ {a b : I → Set} {p₁ p₂ : End a b}
+  extEnd : ∀ {a b : I → Set} {p₁ p₂ : End a b}
     → (∀ (x : Set) → p₁ .proj x ≡ p₂ .proj x)
     → p₁ ≡ p₂
-  extEnd ext projEq = congEnd (ext projEq)
+  extEnd projEq = congEnd (ext projEq)
 
   private
     dimapEnd : ∀ {a a′ b b′ : I → Set} → (a′ ~> a) → (b ~> b′) → End a b → End a′ b′
     dimapEnd f g (mkEnd p _) .proj x = dimap (on-just f) (on-just g) (p x)
     dimapEnd f g (mkEnd p exnat) .extranaturality =
-      dimap-∘ >>= λ dimap-∘# →
       exnat >>= λ exnat# →
       irr[( λ {x⁻} {x⁺} h →
-        let ext₀₀ = lower-extensionality 1ℓ 1ℓ ext
-        in begin
+        begin
           lmap (on-nothing h) (dimap (on-just f) (on-just g) (p x⁺))
-        ≡⟨ dimap-∘# _ _ _ _ (p x⁺) ⟨
+        ≡⟨ dimap-∘ _ _ _ _ (p x⁺) ⟨
           dimap (on-just f ∘ᵢ on-nothing h) (on-just g) (p x⁺)
         ≡⟨ ≡.cong (λ fh → dimap fh (on-just g) (p x⁺)) (ext₀₀ $ on-just-nothing-commute f h) ⟩
           dimap (on-nothing h ∘ᵢ on-just f) (on-just g) (p x⁺)
-        ≡⟨ dimap-∘# _ _ _ _ (p x⁺) ⟩
+        ≡⟨ dimap-∘ _ _ _ _ (p x⁺) ⟩
           dimap (on-just f) (on-just g) (lmap (on-nothing h) (p x⁺))
         ≡⟨ ≡.cong (dimap _ _) (exnat# h) ⟩
           dimap (on-just f) (on-just g) (rmap (on-nothing h) (p x⁻))
-        ≡⟨ dimap-∘# _ _ _ _ (p x⁻) ⟨
+        ≡⟨ dimap-∘ _ _ _ _ (p x⁻) ⟨
           dimap (on-just f) (on-just g ∘ᵢ on-nothing h) (p x⁻)
         ≡⟨ ≡.cong (λ gh → dimap (on-just f) gh (p x⁻)) (ext₀₀ $ on-just-nothing-commute g h) ⟩
           dimap (on-just f) (on-nothing h ∘ᵢ on-just g) (p x⁻)
-        ≡⟨ dimap-∘# _ _ _ _ (p x⁻) ⟩
+        ≡⟨ dimap-∘ _ _ _ _ (p x⁻) ⟩
           rmap (on-nothing h) (dimap (on-just f) (on-just g) (p x⁻))
         ∎
       )]
       where
         open ≡.≡-Reasoning
 
-    dimapEnd-id : Irrelevant (∀ {a b} (p : End a b) → dimapEnd idᵢ idᵢ p ≡ p)
-    dimapEnd-id =
-      dimap-id >>= λ dimap-id# →
-      irr[( λ {a} {b} p → extEnd ext λ x →
-        let ext₀₀ = lower-extensionality 1ℓ 1ℓ ext
-        in begin
+    dimapEnd-id : ∀ {a b} (p : End a b) → dimapEnd idᵢ idᵢ p ≡ p
+    dimapEnd-id {a} {b} p = extEnd λ x →
+        begin
           dimap (on-just idᵢ) (on-just idᵢ) (p .proj x)
         ≡⟨ ≡.cong₂ (λ f g → dimap f g (p .proj x)) (ext₀₀ (on-just-id a x)) (ext₀₀ (on-just-id b x)) ⟩
           dimap idᵢ idᵢ (p .proj x)
-        ≡⟨ dimap-id# (p .proj x) ⟩
+        ≡⟨ dimap-id (p .proj x) ⟩
           p .proj x
         ∎
-      )]
       where
         open ≡.≡-Reasoning
     
-    dimapEnd-∘ : Irrelevant (
+    dimapEnd-∘ :
       ∀ {a a′ a″ b b′ b″}
         → (f₁ : a″ ~> a′) (g₁ : b′ ~> b″) (f₂ : a′ ~> a) (g₂ : b ~> b′)
         → (p : End a b)
         → dimapEnd (f₂ ∘ᵢ f₁) (g₁ ∘ᵢ g₂) p ≡ dimapEnd f₁ g₁ (dimapEnd f₂ g₂ p)
-      )
-    dimapEnd-∘ = 
-      dimap-∘ >>= λ dimap-∘# →
-      irr[( λ f₁ g₁ f₂ g₂ p → extEnd ext λ x →
-        let ext₀₀ = lower-extensionality 1ℓ 1ℓ ext
-        in begin
+    dimapEnd-∘ f₁ g₁ f₂ g₂ p = extEnd λ x →
+        begin
           dimap (on-just (f₂ ∘ᵢ f₁)) (on-just (g₁ ∘ᵢ g₂)) (p .proj x)
         ≡⟨ ≡.cong₂ (λ f g → dimap f g (p .proj x)) (ext₀₀ (on-just-∘ f₂ f₁)) (ext₀₀ (on-just-∘ g₁ g₂)) ⟩
           dimap (on-just f₂ ∘ᵢ on-just f₁) (on-just g₁ ∘ᵢ on-just g₂) (p .proj x)
-        ≡⟨ dimap-∘# _ _ _ _ (p .proj x) ⟩
+        ≡⟨ dimap-∘ _ _ _ _ (p .proj x) ⟩
           dimap (on-just f₁) (on-just g₁) (dimap (on-just f₂) (on-just g₂) (p .proj x))
         ∎
-      )]
         where
           open ≡.≡-Reasoning
           
@@ -198,7 +186,7 @@ module _ {I : Set} where
         
     mapEnd nat .naturality =
       nat .naturality >>= λ naturality# →
-      irr[( λ f g eP → extEnd Q ext λ x →
+      irr[( λ f g eP → extEnd Q λ x →
         naturality# (on-just f) (on-just g) (eP .proj x)
       )]
 
@@ -207,7 +195,7 @@ module _ {I : Set} where
   mapEnd-cong : ∀ {P Q} {α β : P ⇒ Q}
     → .(α ≈ β)
     → Irrelevant (mapEnd α ≈ mapEnd β)
-  mapEnd-cong {Q = Q} eq = irr[( λ eP → extEnd Q ext λ x → eq (eP .proj x) )]
+  mapEnd-cong {Q = Q} eq = irr[( λ eP → extEnd Q λ x → eq (eP .proj x) )]
 
   mapEnd-id : ∀ (P : Profunctor (Maybe I))
     → Irrelevant (mapEnd (idNat {P = P}) ≈ idNat)
@@ -284,45 +272,42 @@ module _ {I : Set} {P : Profunctor I} {Q : Profunctor (Maybe I)} where
 
   private
     -- lemma
-    lmap-on-nothing-fun :
-        (∀ {a* b* : I → Set} (p : P [ a* , b* ]) → dimap P idᵢ idᵢ p ≡ p)
-        → ∀ {a* b* : I → Set} {x x' y : Set} (h : x' → x)
-          (pq : P [ b* , a* ] → Q [ maybe′ a* x , maybe′ b* y ])
+    lmap-on-nothing-fun : ∀ {a* b* : I → Set}
+        → {x x' y : Set} (h : x' → x)
+        → (pq : P [ b* , a* ] → Q [ maybe′ a* x , maybe′ b* y ])
         → ∀ p → lmap (fun (k P) Q) (on-nothing h) pq p ≡ lmap Q (on-nothing h) (pq p)
-    lmap-on-nothing-fun dimap-id-P {x = x} {x' = x'} h pq p =
+    lmap-on-nothing-fun {x = x} {x' = x'} h pq p =
       begin
         lmap (fun (k P) Q) (on-nothing h) pq p
       ≡⟨⟩
         (lmap Q (on-nothing h) ∘′ pq ∘′ rmap (k P) {a = maybe′ _ x} (on-nothing h)) p
       ≡⟨⟩
         (lmap Q (on-nothing h) ∘′ pq ∘′ rmap P idᵢ) p
-      ≡⟨ ≡.cong (lmap Q (on-nothing h) ∘′ pq) (dimap-id-P p) ⟩
+      ≡⟨ ≡.cong (lmap Q (on-nothing h) ∘′ pq) (dimap-id P p) ⟩
         lmap Q (on-nothing h) (pq p)
       ∎
       where open ≡.≡-Reasoning
     
-    rmap-on-nothing-fun :
-        (∀ {a* b* : I → Set} (p : P [ a* , b* ]) → dimap P idᵢ idᵢ p ≡ p)
-        → ∀ {a* b* : I → Set} {x y y' : Set} (h : y → y')
-          (pq : P [ b* , a* ] → Q [ maybe′ a* x , maybe′ b* y ])
+    rmap-on-nothing-fun : ∀ {a* b* : I → Set}
+        → {x y y' : Set} (h : y → y')
+        → (pq : P [ b* , a* ] → Q [ maybe′ a* x , maybe′ b* y ])
         → ∀ p → rmap (fun (k P) Q) (on-nothing h) pq p ≡ rmap Q (on-nothing h) (pq p)
-    rmap-on-nothing-fun dimap-id-P h pq p =
+    rmap-on-nothing-fun h pq p =
       -- Reasoning steps are omitted (as they are refl except one step),
       -- because the proof is almost same for lmap
-      ≡.cong (rmap Q (on-nothing h) ∘′ pq) (dimap-id-P p)
+      ≡.cong (rmap Q (on-nothing h) ∘′ pq) (dimap-id P p)
 
   EndFun⇒FunEnd : EndP (fun (k P) Q) ⇒ fun P (EndP Q)
   EndFun⇒FunEnd .φ ePQ p .proj x = ePQ .proj x p
   EndFun⇒FunEnd .φ {a*} {b*} ePQ p .extranaturality =
     ePQ .extranaturality >>= λ exnat# →
-    dimap-id P >>= λ dimap-id-P# →
     irr[(λ {x⁻ x⁺} h → begin
         lmap Q (on-nothing h) (ePQ .proj x⁺ p)
-      ≡⟨ lmap-on-nothing-fun dimap-id-P# h (ePQ .proj x⁺) p ⟨
+      ≡⟨ lmap-on-nothing-fun h (ePQ .proj x⁺) p ⟨
         lmap (fun (k P) Q) (on-nothing h) (ePQ .proj x⁺) p
       ≡⟨ ≡.cong-app (exnat# h) p ⟩
         rmap (fun (k P) Q) (on-nothing h) (ePQ .proj x⁻) p
-      ≡⟨ rmap-on-nothing-fun dimap-id-P# h (ePQ .proj x⁻) p ⟩
+      ≡⟨ rmap-on-nothing-fun h (ePQ .proj x⁻) p ⟩
         rmap Q (on-nothing h) (ePQ .proj x⁻ p)
       ∎
     )]
@@ -376,7 +361,7 @@ private
     uniqueness {a*} {b*} α =
       α .extranaturality >>= λ exnat# →
       irr[( 
-        extEnd fun₀ ext λ a₀ →
+        extEnd fun₀ λ a₀ →
           ext λ x@(lift x₀) →
             begin
               proj α a₀ x

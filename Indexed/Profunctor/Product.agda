@@ -38,20 +38,12 @@ _×_ {I} P Q =
   record {
     Carrier = λ a b → P [ a , b ] Prod.× Q [ a , b ];
     dimap = λ f g → mapProd (dimap P f g) (dimap Q f g);
-    dimap-id = 
-      dimap-id P >>= λ dimap-id-P →
-      dimap-id Q >>= λ dimap-id-Q →
-      irr[( λ (pair x₁ x₂) →
-        ≡.cong₂ pair (dimap-id-P x₁) (dimap-id-Q x₂)
-      )];
-    dimap-∘ = 
-      dimap-∘ P >>= λ dimap-∘-P →
-      dimap-∘ Q >>= λ dimap-∘-Q →
-      irr[( λ f₁ g₁ f₂ g₂ (pair x₁ x₂) →
-        let eqP = dimap-∘-P f₁ g₁ f₂ g₂ x₁
-            eqQ = dimap-∘-Q f₁ g₁ f₂ g₂ x₂
-        in ≡.cong₂ Prod._,_ eqP eqQ 
-      )]
+    dimap-id = λ (pair x₁ x₂) →
+        ≡.cong₂ pair (dimap-id P x₁) (dimap-id Q x₂);
+    dimap-∘ = λ f₁ g₁ f₂ g₂ (pair x₁ x₂) →
+        let eqP = dimap-∘ P f₁ g₁ f₂ g₂ x₁
+            eqQ = dimap-∘ Q f₁ g₁ f₂ g₂ x₂
+        in ≡.cong₂ Prod._,_ eqP eqQ
   }
   where
     open Profunctor

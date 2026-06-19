@@ -52,24 +52,17 @@ _+_ {I} P Q =
   record {
     Carrier = λ a b → P [ a , b ] ⊎ Q [ a , b ];
     dimap = λ f g → mapSum (dimap P f g) (dimap Q f g);
-    dimap-id =
-      dimap-id P >>= λ dimap-id-P →
-      dimap-id Q >>= λ dimap-id-Q →
-      irr[( λ x →
+    dimap-id = λ x →
         begin
           mapSum (dimap P idᵢ idᵢ) (dimap Q idᵢ idᵢ) x
-        ≡⟨ mapSum-cong dimap-id-P dimap-id-Q x ⟩
+        ≡⟨ mapSum-cong (dimap-id P) (dimap-id Q) x ⟩
           mapSum id id x
         ≡⟨ mapSum-id x ⟩
           x
-        ∎
-      )] ;
-    dimap-∘ =
-      dimap-∘ P >>= λ dimap-∘-P →
-      dimap-∘ Q >>= λ dimap-∘-Q →
-      irr[( λ f₁ g₁ f₂ g₂ x →
-      let eqP = dimap-∘-P f₁ g₁ f₂ g₂
-          eqQ = dimap-∘-Q f₁ g₁ f₂ g₂
+        ∎;
+    dimap-∘ = λ f₁ g₁ f₂ g₂ x →
+      let eqP = dimap-∘ P f₁ g₁ f₂ g₂
+          eqQ = dimap-∘ Q f₁ g₁ f₂ g₂
       in
         begin
           mapSum (dimap P (f₂ ∘ᵢ f₁) (g₁ ∘ᵢ g₂)) (dimap Q (f₂ ∘ᵢ f₁) (g₁ ∘ᵢ g₂)) x
@@ -78,7 +71,6 @@ _+_ {I} P Q =
         ≡⟨ mapSum-∘ _ _ _ _ x ⟩
           mapSum (dimap P f₁ g₁) (dimap Q f₁ g₁) (mapSum (dimap P f₂ g₂) (dimap Q f₂ g₂) x)
         ∎
-    )]
   }
   where
     open Profunctor

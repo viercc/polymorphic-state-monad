@@ -53,13 +53,11 @@ record Profunctor (I : Set) : Set₂ where
   field
     dimap : ∀ {a a′ b b′ : I → Set} → (a′ ~> a) → (b ~> b′) → P a b → P a′ b′
 
-    dimap-id : Irrelevant (∀ {a b} (x : P a b) → dimap idᵢ idᵢ x ≡ x)
+    dimap-id : ∀ {a b} (x : P a b) → dimap idᵢ idᵢ x ≡ x
     
-    dimap-∘ : Irrelevant (
-        ∀ {a a′ a″ b b′ b″}
-        → (f₁ : a″ ~> a′) (g₁ : b′ ~> b″) (f₂ : a′ ~> a) (g₂ : b ~> b′)
-        → dimap (f₂ ∘ᵢ f₁) (g₁ ∘ᵢ g₂) ≗ dimap f₁ g₁ ∘′ dimap f₂ g₂
-      )
+    dimap-∘ : ∀ {a a′ a″ b b′ b″}
+      → (f₁ : a″ ~> a′) (g₁ : b′ ~> b″) (f₂ : a′ ~> a) (g₂ : b ~> b′)
+      → dimap (f₂ ∘ᵢ f₁) (g₁ ∘ᵢ g₂) ≗ dimap f₁ g₁ ∘′ dimap f₂ g₂
 
   lmap : ∀ {a a′ b} → (a′ ~> a) → P a b → P a′ b
   lmap f = dimap f idᵢ
@@ -83,10 +81,8 @@ mapIndex : {I J : Set} (F : I → J) (P : Profunctor I) → Profunctor J
 mapIndex {I} {J} F P = record {
     Carrier = λ a b → P [ a ∘ F , b ∘ F ];
     dimap = λ f g → dimap (f ∘ F) (g ∘ F);
-    dimap-id = dimap-id >>= λ dimap-id# → irr[ dimap-id# ];
-    dimap-∘ = dimap-∘ >>= λ dimap-∘# → irr[(
-        λ f₁ g₁ f₂ g₂ → dimap-∘# (f₁ ∘ F) (g₁ ∘ F) (f₂ ∘ F) (g₂ ∘ F)
-      )]
+    dimap-id = dimap-id;
+    dimap-∘ = λ f₁ g₁ f₂ g₂ → dimap-∘ (f₁ ∘ F) (g₁ ∘ F) (f₂ ∘ F) (g₂ ∘ F)
   }
   where open Profunctor P
 
@@ -244,8 +240,8 @@ hom : ∀ {I} → Profunctor I
 hom = record {
     Carrier = λ a b → Lift 1ℓ (∀ i → a i → b i);
     dimap = λ f g (lift p) → lift (g ∘ᵢ p ∘ᵢ f);
-    dimap-id = irr[( λ _ → ≡.refl )];
-    dimap-∘ = irr[( λ _ _ _ _ _ → ≡.refl )]
+    dimap-id = λ _ → ≡.refl;
+    dimap-∘ = λ _ _ _ _ _ → ≡.refl
   }
 
 -- constant profunctor
@@ -253,8 +249,8 @@ constant : ∀ {I} → (c : Set) → Profunctor I
 constant c = record {
     Carrier = λ _ _ → Lift 1ℓ c;
     dimap = λ _ _ p → p;
-    dimap-id = irr[( λ _ → ≡.refl )];
-    dimap-∘ = irr[( λ _ _ _ _ _ → ≡.refl )]
+    dimap-id = λ _ → ≡.refl;
+    dimap-∘ = λ _ _ _ _ _ → ≡.refl
   }
 
 -- * Initial and terminal profunctors
@@ -287,8 +283,8 @@ var : ∀ {I} → I → Profunctor I
 var i = record {
     Carrier = λ _ b → Lift 1ℓ (b i);
     dimap = λ _ g p → lift (g i (lower p)) ;
-    dimap-id = irr[( λ _ → ≡.refl )];
-    dimap-∘ = irr[( λ _ _ _ _ _ → ≡.refl )]
+    dimap-id = λ _ → ≡.refl;
+    dimap-∘ = λ _ _ _ _ _ → ≡.refl
   }
 
 v0 : ∀ {I} → Profunctor (Maybe I)
@@ -298,10 +294,12 @@ k : ∀ {I} → Profunctor I → Profunctor (Maybe I)
 k = mapIndex just
 
 
--- Theorems depending on function extensionality.
--- The supplied extensionality is marked irrelevant,
--- so that its use is restricted to irrelevant contexts.
-module WithExt .(ext : Extensionality 1ℓ 1ℓ) where
+-- Theorems depending on function extensionality
+module WithExt (ext : Extensionality 1ℓ 1ℓ) where
+  private
+    iext : ExtensionalityImplicit 1ℓ 1ℓ
+    iext = implicit-extensionality ext
+  
   module _ {I : Set} {P Q : Profunctor I} where
     private
       congNat : ∀ {nat1 nat2 : P ⇒ Q}
@@ -313,9 +311,7 @@ module WithExt .(ext : Extensionality 1ℓ 1ℓ) where
       → .(nat1 ≈ nat2)
       → Irrelevant (nat1 ≡ nat2)
     extNat {nat1 = nat1} {nat2 = nat2} eqφ =
-        let .iext : ExtensionalityImplicit 1ℓ 1ℓ
-            iext = implicit-extensionality ext
-        in irr[ congNat (iext (iext (ext eqφ))) ]
+      irr[ congNat (iext (iext (ext eqφ))) ]
 
   module _ {I : Set} {P Q : Profunctor I} where
     private

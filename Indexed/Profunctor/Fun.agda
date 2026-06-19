@@ -23,7 +23,7 @@ open import Indexed.Profunctor.Functor
 open import Indexed.Profunctor.Product
 
 -- | "Function" Profunctors
-module Indexed.Profunctor.Fun .(ext : Extensionality 1ℓ 1ℓ) where
+module Indexed.Profunctor.Fun (ext : Extensionality 1ℓ 1ℓ) where
 
 open Profunctor
 open NaturalTransformation
@@ -53,20 +53,12 @@ fun : ∀{I} → Profunctor I → Profunctor I → Profunctor I
 fun {I} P Q = record {
     Carrier = λ a b → P [ b , a ] → Q [ a , b ];
     dimap = λ f g → dimap-fun (dimap P g f) (dimap Q f g);
-    dimap-id = 
-      dimap-id P >>= λ dimap-id-P →
-      dimap-id Q >>= λ dimap-id-Q →
-      irr[( λ pq →
-        ext (dimap-fun-cong dimap-id-P dimap-id-Q pq)
-      )];
-    dimap-∘ = 
-      dimap-∘ P >>= λ dimap-∘-P →
-      dimap-∘ Q >>= λ dimap-∘-Q →
-      irr[( λ f₁ g₁ f₂ g₂ pq →
-      let eqP = dimap-∘-P g₂ f₂ g₁ f₁
-          eqQ = dimap-∘-Q f₁ g₁ f₂ g₂
+    dimap-id = λ pq →
+        ext (dimap-fun-cong (dimap-id P) (dimap-id Q) pq);
+    dimap-∘ = λ f₁ g₁ f₂ g₂ pq →
+      let eqP = dimap-∘ P g₂ f₂ g₁ f₁
+          eqQ = dimap-∘ Q f₁ g₁ f₂ g₂
       in ext (dimap-fun-cong eqP eqQ pq)
-      )]
   }
   where
     open Profunctor
