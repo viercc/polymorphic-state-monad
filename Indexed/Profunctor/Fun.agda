@@ -25,6 +25,9 @@ open import Indexed.Profunctor.Product
 -- | "Function" Profunctors
 module Indexed.Profunctor.Fun .(ext : Extensionality 1ℓ 1ℓ) where
 
+open Profunctor
+open NaturalTransformation
+
 private
   module _ {A B C D : Set₁} where
     dimap-fun : (B → A) → (C → D) → (A → C) → (B → D)
@@ -68,6 +71,43 @@ fun {I} P Q = record {
   where
     open Profunctor
     open ≡.≡-Reasoning
+
+module _ {I} {A : Profunctor I} where
+  mapFun : ∀ {P Q : Profunctor I}
+    → (P ⇒ Q) → fun A P ⇒ fun A Q
+  mapFun α .φ ap = α .φ ∘′ ap
+  mapFun {P} {Q} α .naturality =
+    α .naturality >>= λ α-nat# → 
+    irr[(λ f g ap → ext λ a →
+      begin
+        (α .φ ∘′ dimap (fun A P) f g ap) a
+      ≡⟨⟩
+        (α .φ ∘′ dimap P f g ∘′ ap ∘′ dimap A g f) a
+      ≡⟨ α-nat# f g (ap (dimap A g f a)) ⟩
+        (dimap Q f g ∘′ α .φ ∘′ ap ∘′ dimap A g f) a
+      ≡⟨⟩
+        dimap (fun A Q) f g (α .φ ∘′ ap) a
+      ∎
+    )]
+      where open ≡.≡-Reasoning
+
+  mapFun-id : ∀ (P : Profunctor I)
+    → Irrelevant(mapFun (idNat {P = P}) ≈ idNat)
+  mapFun-id P = irr[(λ ap → ext (λ a → ≡.refl) )]
+
+  mapFun-∘ : ∀ {P Q R : Profunctor I}
+    → (qr : Q ⇒ R) (pq : P ⇒ Q)
+    → Irrelevant (mapFun (qr ∘Nat pq) ≈ (mapFun qr ∘Nat mapFun pq))
+  mapFun-∘ qr pq = irr[(λ ap → ext (λ a → ≡.refl))]
+
+  open IsFunctor
+
+  instance
+    funIsFunctor : IsFunctor I I (fun A)
+    funIsFunctor .promap = mapFun
+    funIsFunctor .promap-cong = λ eq → irr[(λ ap → ext (λ a → eq (ap a)))]
+    funIsFunctor .promap-id = mapFun-id
+    funIsFunctor .promap-∘ = mapFun-∘
 
 -- TODO:
 -- 
