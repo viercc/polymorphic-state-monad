@@ -17,6 +17,9 @@ open import Data.Maybe using (Maybe; nothing; just; maybe; maybe′)
 open import Relation.Binary.PropositionalEquality as ≡
    using (_≡_; _≗_)
 
+open import Data.Irrelevant
+   using (Irrelevant; _>>=_; _<*>_)
+   renaming (map to irrmap; [_] to irr[_])
 open import ExtensionalityUtil
 
 -- | Profunctors between (I → Set) and itself,
