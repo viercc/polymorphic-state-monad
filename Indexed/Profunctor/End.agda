@@ -33,7 +33,7 @@ open WithExt ext
 open import Indexed.Profunctor.Functor
 
 open import Indexed.Profunctor.Product
-open import Indexed.Profunctor.Fun ext
+import Indexed.Profunctor.Fun as Fun
 
 private
   ext₀₀ : Extensionality 0ℓ 0ℓ
@@ -66,7 +66,7 @@ private
 
 -- * One-parameter End of a Profunctor
 
-module _ {I : Set} (P : Profunctor (Maybe I)) where
+module _ {I : Set} (P : Profunctor 1ℓ (Maybe I)) where
   open Profunctor P
 
   record End (a b : I → Set) : Set₁ where
@@ -157,7 +157,7 @@ module _ {I : Set} (P : Profunctor (Maybe I)) where
           open ≡.≡-Reasoning
           
   
-  EndP : Profunctor I
+  EndP : Profunctor 1ℓ I
   EndP .Carrier = End
   EndP .dimap = dimapEnd
   EndP .dimap-id = dimapEnd-id
@@ -168,7 +168,7 @@ module _ {I : Set} where
 
   -- 1. mapping natural transformation over End:
   --   (P ⇒ Q) → (EndP P ⇒ EndP Q)
-  module _ {P Q : Profunctor (Maybe I)} where
+  module _ {P Q : Profunctor 1ℓ (Maybe I)} where
     mapEnd : (P ⇒ Q) -> (EndP P ⇒ EndP Q)
     mapEnd nat .φ eP .proj x = nat .φ (eP .proj x)
     mapEnd nat .φ eP .extranaturality =
@@ -200,7 +200,7 @@ module _ {I : Set} where
     → Irrelevant (mapEnd α ≈ mapEnd β)
   mapEnd-cong {Q = Q} eq = irr[( λ eP → extEnd Q λ x → eq (eP .proj x) )]
 
-  mapEnd-id : ∀ (P : Profunctor (Maybe I))
+  mapEnd-id : ∀ (P : Profunctor 1ℓ (Maybe I))
     → Irrelevant (mapEnd (idNat {P = P}) ≈ idNat)
   mapEnd-id _ = irr[( λ _ → ≡.refl )]
 
@@ -225,7 +225,7 @@ module _ {I : Set} where
 
 -- 4. End commutes with ×
 --    EndP (P × Q) ⇔ EndP P × EndP Q
-module _ {I : Set} {P Q : Profunctor (Maybe I)} where
+module _ {I : Set} {P Q : Profunctor 1ℓ (Maybe I)} where
   open Profunctor
   open NaturalIso
 
@@ -269,7 +269,8 @@ module _ {I : Set} {P Q : Profunctor (Maybe I)} where
 --    is non-conservative/unsafe.  Therefore we deliberately do not provide
 --    FunEnd⇒EndFun.
 
-module _ {I : Set} {P : Profunctor I} {Q : Profunctor (Maybe I)} where
+module _ {I : Set} {P : Profunctor 1ℓ I} {Q : Profunctor 1ℓ (Maybe I)} where
+  open Fun {ℓ = 1ℓ} ext
   open Profunctor
   open NaturalIso
 
@@ -332,16 +333,15 @@ private
   -- Example usage
 
   module parametricity-id {I : Set} where
-    -- Profunctor (a₀ → b₀)
-    -- (ignores other type variables)
-    fun₀ : Profunctor (Maybe I)
-    fun₀ = fun v0 v0
+    open Profunctor
+    open Fun {ℓ = 0ℓ} (lower-extensionality 1ℓ 1ℓ ext)
 
-    open Profunctor fun₀
+    x→x : Profunctor 1ℓ (Maybe I)
+    x→x = LiftP 1ℓ (fun v0 v0)
 
-    idEnd : ∀ {a* b*} → End fun₀ a* b*
+    idEnd : ∀ {a* b*} → End x→x a* b*
     idEnd = record {
-        proj = λ _ → id;
+        proj = λ _ → lift id;
         extranaturality = irr[( λ _ → ≡.refl )]
       }
     
@@ -350,35 +350,37 @@ private
       tt₁ : Lift 1ℓ ⊤
       tt₁ = lift tt
       
-      -- Carrier type of fun₀ profunctor, definition unfolded
-      -- 
-      --   proj α a₀ : fun₀ [ maybe′ a* a₀ , maybe′ b* a₀ ]
-      --   proj α a₀ : Lift 1ℓ a₀ → Lift 1ℓ a₀
       _ : ∀ {a b : Maybe I → Set}
-        → fun₀ [ a , b ] ≡ (Lift 1ℓ (a nothing) → Lift 1ℓ (b nothing))
+        → x→x [ a , b ] ≡ Lift 1ℓ (a nothing → b nothing)
       _ = ≡.refl
     
     -- In Haskell, `id` is the only inhabitant of type `∀ a. a → a`.
     -- The following is the corresponding statement in terms of End.
-    uniqueness : ∀ {a* b*} → (α : End fun₀ a* b*) → Irrelevant (α ≡ idEnd)
+    uniqueness : ∀ {a* b*} → (α : End x→x a* b*) → Irrelevant (α ≡ idEnd)
     uniqueness {a*} {b*} α =
       α .extranaturality >>= λ exnat# →
       irr[( 
-        extEnd fun₀ λ a₀ →
-          ext λ x@(lift x₀) →
+        extEnd x→x λ a₀ → ≡.cong lift $
+          ext₀₀ λ x →
             begin
-              proj α a₀ x
+              α[ a₀ ] x
             ≡⟨⟩
-              (proj α a₀ ∘′ const x) tt₁
+              (α[ a₀ ] ∘′ const x) tt
             ≡⟨⟩
-              (proj α a₀ ∘ (lift ∘ on-nothing {a = a*} (const x₀) nothing ∘ lower)) tt₁
-            ≡⟨ ≡.cong-app (exnat# (const x₀)) tt₁ ⟩
-              ((lift ∘ on-nothing {a = b*} (const x₀) nothing ∘ lower) ∘ proj α ⊤) tt₁
+              (α[ a₀ ] ∘′ on-nothing {a = a*} (const x) nothing) tt
             ≡⟨⟩
-              (const x ∘ proj α ⊤) tt₁
+              lower (lmap x→x {b = maybe′ b* a₀} (on-nothing {a = a*} (const x)) (α .proj a₀)) tt
+            ≡⟨ ≡.cong-app (≡.cong lower (exnat# (const x))) tt ⟩
+              lower (rmap x→x {a = maybe′ a* ⊤} (on-nothing {a = b*} (const x)) (α .proj ⊤)) tt
+            ≡⟨⟩
+              (on-nothing {a = b*} (const x) nothing ∘′ α[ ⊤ ]) tt
+            ≡⟨⟩
+              (const x ∘′ α[ ⊤ ]) tt
             ≡⟨⟩
               x
             ∎
       )]
       where
+        α[_] : (a₀ : Set) → a₀ → a₀
+        α[ a₀ ] = lower (proj α a₀)
         open ≡.≡-Reasoning

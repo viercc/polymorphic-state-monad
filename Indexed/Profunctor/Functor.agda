@@ -26,28 +26,28 @@ open import Indexed.Profunctor
 module Indexed.Profunctor.Functor where
 
 record IsFunctor
-  (I J : Set) (F : Profunctor I → Profunctor J) : Set₂ where
+  {ℓ ℓ'} (I J : Set) (F : Profunctor ℓ I → Profunctor ℓ' J) : Set (suc (ℓ ⊔ ℓ' ⊔ suc 0ℓ)) where
 
   field
-    promap : ∀ {P Q : Profunctor I} 
+    promap : ∀ {P Q : Profunctor ℓ I}
       → P ⇒ Q → F P ⇒ F Q
 
-    promap-cong : ∀ {P Q : Profunctor I} {α β : P ⇒ Q}
+    promap-cong : ∀ {P Q : Profunctor ℓ I} {α β : P ⇒ Q}
       → .(α ≈ β) → Irrelevant (promap α ≈ promap β)
     
-    promap-id : ∀ (P : Profunctor I)
+    promap-id : ∀ (P : Profunctor ℓ I)
       → Irrelevant (promap (idNat {P = P}) ≈ idNat)
     
-    promap-∘ : ∀ {P Q R : Profunctor I}
+    promap-∘ : ∀ {P Q R : Profunctor ℓ I}
       → (qr : Q ⇒ R) (pq : P ⇒ Q)
       → Irrelevant (promap (qr ∘Nat pq) ≈ (promap qr ∘Nat promap pq))
 
 open IsFunctor {{...}}
 
 -- mapIndex is a Profunctor Functor
-module _ {I J : Set} {t : I → J} where
+module _ {ℓ : Level} {I J : Set} {t : I → J} where
   instance
-    mapIndexIsFunctor : IsFunctor I J (mapIndex t)
+    mapIndexIsFunctor : IsFunctor {ℓ = ℓ} {ℓ' = ℓ} I J (mapIndex t)
     mapIndexIsFunctor .promap pq .φ = pq .φ
     mapIndexIsFunctor .promap-cong α≈β = irr[ α≈β ]
     mapIndexIsFunctor .promap pq .naturality =
@@ -57,12 +57,12 @@ module _ {I J : Set} {t : I → J} where
     mapIndexIsFunctor .promap-∘ _ _ = irr[( λ _ → ≡.refl )]
 
 -- Profunctor Functor preserves NaturalIso
-module _ {I J : Set} where
+module _ {ℓ ℓ' : Level} {I J : Set} where
   open NaturalIso
 
-  promapRightInv : ∀ (F : Profunctor I → Profunctor J)
+  promapRightInv : ∀ (F : Profunctor ℓ I → Profunctor ℓ' J)
     {{ isFunctor : IsFunctor I J F }}
-    → ∀ {P Q : Profunctor I}
+    → ∀ {P Q : Profunctor ℓ I}
     → (α : P ⇒ Q) → (β : Q ⇒ P)
     → .(α ∘Nat β ≈ idNat)
     → Irrelevant (promap α ∘Nat promap {{isFunctor}} β ≈ idNat)
@@ -81,9 +81,9 @@ module _ {I J : Set} where
       ∎ )]
     where open ≡.≡-Reasoning
 
-  promapIso : ∀ (F : Profunctor I → Profunctor J)
+  promapIso : ∀ (F : Profunctor ℓ I → Profunctor ℓ' J)
     {{ isFunctor : IsFunctor I J F }}
-    → ∀ {P Q : Profunctor I}
+    → ∀ {P Q : Profunctor ℓ I}
     → (P ⇔ Q) → F P ⇔ F Q
   promapIso F P⇔Q .to = promap (P⇔Q .to)
   promapIso F P⇔Q .from = promap (P⇔Q .from)

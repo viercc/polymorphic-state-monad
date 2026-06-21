@@ -26,13 +26,13 @@ open import Indexed.Profunctor.Functor
 open import Indexed.Profunctor.Product
 
 -- | "Function" Profunctors
-module Indexed.Profunctor.Fun (ext : Extensionality 1ℓ 1ℓ) where
+module Indexed.Profunctor.Fun {ℓ} (ext : Extensionality ℓ ℓ) {I} where
 
 open Profunctor
 open NaturalTransformation
 
 private
-  module _ {A B C D : Set₁} where
+  module _ {A B C D : Set ℓ} where
     dimap-fun : (B → A) → (C → D) → (A → C) → (B → D)
     dimap-fun pre post f = post ∘′ f ∘′ pre
 
@@ -52,8 +52,8 @@ private
       ∎
       where open ≡.≡-Reasoning
 
-fun : ∀{I} → Profunctor I → Profunctor I → Profunctor I
-fun {I} P Q = record {
+fun : Profunctor ℓ I → Profunctor ℓ I → Profunctor ℓ I
+fun P Q = record {
     Carrier = λ a b → P [ b , a ] → Q [ a , b ];
     dimap = λ f g → dimap-fun (dimap P g f) (dimap Q f g);
     dimap-id = λ pq →
@@ -67,8 +67,8 @@ fun {I} P Q = record {
     open Profunctor
     open ≡.≡-Reasoning
 
-module _ {I} {A : Profunctor I} where
-  mapFun : ∀ {P Q : Profunctor I}
+module _ {A : Profunctor ℓ I} where
+  mapFun : ∀ {P Q : Profunctor ℓ I}
     → (P ⇒ Q) → fun A P ⇒ fun A Q
   mapFun α .φ ap = α .φ ∘′ ap
   mapFun {P} {Q} α .naturality =
@@ -86,11 +86,11 @@ module _ {I} {A : Profunctor I} where
     )]
       where open ≡.≡-Reasoning
 
-  mapFun-id : ∀ (P : Profunctor I)
+  mapFun-id : ∀ (P : Profunctor ℓ I)
     → Irrelevant(mapFun (idNat {P = P}) ≈ idNat)
   mapFun-id P = irr[(λ ap → ext (λ a → ≡.refl) )]
 
-  mapFun-∘ : ∀ {P Q R : Profunctor I}
+  mapFun-∘ : ∀ {P Q R : Profunctor ℓ I}
     → (qr : Q ⇒ R) (pq : P ⇒ Q)
     → Irrelevant (mapFun (qr ∘Nat pq) ≈ (mapFun qr ∘Nat mapFun pq))
   mapFun-∘ qr pq = irr[(λ ap → ext (λ a → ≡.refl))]
@@ -114,14 +114,3 @@ module _ {I} {A : Profunctor I} where
 --    - [_] Adjunction (_× P) ⊣ (fun P)
 --      - currying, uncurrying (, evaluation, coevaluation)
 --      - fun (P + Q) R ⇔ fun P R × fun Q R
-
-private
-  module examples where
-
-    _ : ∀ a b →
-      (fun (v0 {⊥} × fun v0 v0) v0) [ a , b ]
-        ≡ let
-            a₀ = Lift 1ℓ (a nothing)
-            b₀ = Lift 1ℓ (b nothing)
-          in a₀ Prod.× (b₀ → a₀) → b₀
-    _ = λ a b → ≡.refl

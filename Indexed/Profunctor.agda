@@ -44,11 +44,11 @@ _∘ᵢ_ f g i = f i ∘′ g i
 
 -- * Profunctor type
 
-record Profunctor (I : Set) : Set₂ where
+record Profunctor (ℓ : Level) (I : Set) : Set (suc (ℓ ⊔ 1ℓ)) where
   constructor mkProfunctor
 
   field
-    Carrier : (I → Set) → (I → Set) → Set₁
+    Carrier : (I → Set) → (I → Set) → Set ℓ
   
   private
     P = Carrier
@@ -70,18 +70,18 @@ record Profunctor (I : Set) : Set₂ where
 
 infix 20 Carrier-syntax
 
-Carrier-syntax : ∀ {I} → Profunctor I → (I → Set) → (I → Set) → Set₁
+Carrier-syntax : ∀ {ℓ} {I} → Profunctor ℓ I → (I → Set) → (I → Set) → Set ℓ
 Carrier-syntax = Profunctor.Carrier
 
 syntax Carrier-syntax P a b = P [ a , b ]
 
-phantom : {P : Profunctor ⊥}
+phantom : ∀ {ℓ} {P : Profunctor ℓ ⊥}
   → ∀ {a b c d} → P [ a , b ] → P [ c , d ]
 phantom {P = P} = Profunctor.dimap P (λ ()) (λ ())
 
 -- Remap index set by a function (F : I → J)
-mapIndex : {I J : Set} (F : I → J) (P : Profunctor I) → Profunctor J
-mapIndex {I} {J} F P = record {
+mapIndex : ∀ {ℓ} {I J : Set} (F : I → J) (P : Profunctor ℓ I) → Profunctor ℓ J
+mapIndex {ℓ} {I} {J} F P = record {
     Carrier = λ a b → P [ a ∘ F , b ∘ F ];
     dimap = λ f g → dimap (f ∘ F) (g ∘ F);
     dimap-id = dimap-id;
@@ -91,7 +91,8 @@ mapIndex {I} {J} F P = record {
 
 -- * Morphism and isomorphism
 
-record NaturalTransformation {I : Set} (P Q : Profunctor I) : Set₁ where
+record NaturalTransformation {ℓ ℓ' : Level} {I : Set}
+  (P : Profunctor ℓ I) (Q : Profunctor ℓ' I) : Set (ℓ ⊔ ℓ' ⊔ 1ℓ) where
   open Profunctor P renaming (dimap to dimapP)
   open Profunctor Q renaming (dimap to dimapQ)
 
@@ -99,7 +100,7 @@ record NaturalTransformation {I : Set} (P Q : Profunctor I) : Set₁ where
     φ : ∀ {a b : I → Set}
       → P [ a , b ] → Q [ a , b ]
   
-  Naturality : Set₁
+  Naturality : Set (ℓ ⊔ ℓ' ⊔ 1ℓ)
   Naturality = ∀ {a a′ b b′ : I → Set}
       → (f : a′ ~> a) (g : b ~> b′) (x : P [ a , b ])
       → φ (dimapP f g x) ≡ dimapQ f g (φ x)
@@ -112,13 +113,14 @@ open NaturalTransformation public
 infix 1 NaturalTransformation
 syntax NaturalTransformation a b = a ⇒ b
 
-idNat : {I : Set} {P : Profunctor I} → P ⇒ P
+idNat : {ℓ : Level} {I : Set} {P : Profunctor ℓ I} → P ⇒ P
 idNat = record {
     φ = id;
     naturality = irr[( λ _ _ _ → ≡.refl )]
   }
 
-_∘Nat_ : {I : Set} {P Q R : Profunctor I} → Q ⇒ R → P ⇒ Q → P ⇒ R
+_∘Nat_ : ∀ {ℓ ℓ' ℓ''} {I}
+  {P : Profunctor ℓ I} {Q : Profunctor ℓ' I} {R : Profunctor ℓ'' I} → Q ⇒ R → P ⇒ Q → P ⇒ R
 _∘Nat_ qr pq .φ = φ qr ∘ φ pq
 _∘Nat_ qr pq .naturality =
   naturality pq >>= λ natPQ →
@@ -130,10 +132,12 @@ _∘Nat_ qr pq .naturality =
 
 -- Pointwise equality between natural transformations
 infix 1 _≈_
-_≈_ : {I : Set} {P Q : Profunctor I} → (P ⇒ Q) → (P ⇒ Q) → Set₁
+_≈_ : {ℓ ℓ' : Level} {I : Set} {P : Profunctor ℓ I} {Q : Profunctor ℓ' I}
+  → (P ⇒ Q) → (P ⇒ Q) → Set (ℓ ⊔ ℓ' ⊔ 1ℓ)
 _≈_ {P = P} α β = ∀ {a b} (p : P [ a , b ]) → α .φ p ≡ β .φ p
 
-record NaturalIso {I : Set} (P Q : Profunctor I) : Set₁ where
+record NaturalIso {ℓ ℓ' : Level} {I : Set}
+  (P : Profunctor ℓ I) (Q : Profunctor ℓ' I) : Set (ℓ ⊔ ℓ' ⊔ 1ℓ) where
   field
     to : P ⇒ Q
     from : Q ⇒ P
@@ -145,14 +149,14 @@ open NaturalIso
 infix 1 NaturalIso
 syntax NaturalIso P Q = P ⇔ Q
 
-idIso : ∀ {I} {P : Profunctor I} → P ⇔ P
+idIso : ∀ {ℓ} {I} {P : Profunctor ℓ I} → P ⇔ P
 idIso = record {
     to = idNat; from = idNat;
     to-from = irr[ (λ _ → ≡.refl) ];
     from-to = irr[ (λ _ → ≡.refl) ]
   }
 
-symIso : ∀ {I} {P Q : Profunctor I}
+symIso : ∀ {ℓ ℓ'} {I} {P : Profunctor ℓ I} {Q : Profunctor ℓ' I}
   → P ⇔ Q → Q ⇔ P
 symIso P⇔Q = record {
     to = P⇔Q .from;
@@ -161,9 +165,10 @@ symIso P⇔Q = record {
     from-to = P⇔Q .to-from
   }
 
-transIso : ∀ {I} {P Q R : Profunctor I}
+transIso : ∀ {ℓ ℓ' ℓ''} {I}
+  {P : Profunctor ℓ I} {Q : Profunctor ℓ' I} {R : Profunctor ℓ'' I}
   → P ⇔ Q → Q ⇔ R → P ⇔ R
-transIso {_} {P} {Q} {R} P⇔Q Q⇔R = record{
+transIso {P = P} {Q = Q} {R = R} P⇔Q Q⇔R = record{
     to = P⇒R; from = R⇒P;
     to-from = to-from-PR;
     from-to = from-to-PR
@@ -215,12 +220,12 @@ transIso {_} {P} {Q} {R} P⇔Q Q⇔R = record{
 -- It is a stronger claim than pointwise equalities ≈ required for
 -- NaturalIso.
 
-RightInv LeftInv : ∀ {I : Set} {P Q : Profunctor I} 
+RightInv LeftInv : ∀ {ℓ ℓ'} {I : Set} {P : Profunctor ℓ I} {Q : Profunctor ℓ' I} 
   → P ⇒ Q → Q ⇒ P → Set _
 RightInv f g = f ∘Nat g ≡ idNat
 LeftInv f g = g ∘Nat f ≡ idNat
 
-naturalIsoBy≡ : ∀ {I : Set} {P Q : Profunctor I}
+naturalIsoBy≡ : ∀ {ℓ ℓ'} {I : Set} {P : Profunctor ℓ I} {Q : Profunctor ℓ' I} 
   (f : P ⇒ Q) (g : Q ⇒ P)
   → .(RightInv f g)
   → .(LeftInv f g)
@@ -237,86 +242,88 @@ naturalIsoBy≡ f g fg≡id gf≡id =
     )]
   }
 
--- * Simple instances
+-- * Simple instances (at 0ℓ)
 
-hom : ∀ {I} → Profunctor I
+hom : ∀ {I} → Profunctor 0ℓ I
 hom = record {
-    Carrier = λ a b → Lift 1ℓ (∀ i → a i → b i);
-    dimap = λ f g (lift p) → lift (g ∘ᵢ p ∘ᵢ f);
+    Carrier = _~>_;
+    dimap = λ f g p → g ∘ᵢ p ∘ᵢ f;
     dimap-id = λ _ → ≡.refl;
     dimap-∘ = λ _ _ _ _ _ → ≡.refl
   }
 
 -- constant profunctor
-constant : ∀ {I} → (c : Set) → Profunctor I
+constant : ∀ {I} → (c : Set) → Profunctor 0ℓ I
 constant c = record {
-    Carrier = λ _ _ → Lift 1ℓ c;
+    Carrier = λ _ _ → c;
     dimap = λ _ _ p → p;
     dimap-id = λ _ → ≡.refl;
     dimap-∘ = λ _ _ _ _ _ → ≡.refl
   }
 
--- * Initial and terminal profunctors
-
-empty unit : ∀ {I} → Profunctor I
-empty = constant ⊥
-unit = constant ⊤
-
-elim-empty : ∀ {I} {P : Profunctor I}
-  → empty ⇒ P
-elim-empty .φ = λ ()
-elim-empty .naturality = irr[( λ _ _ () )]
-
-elim-empty-univ : ∀ {I} {P : Profunctor I}
-  → ∀ (elim' : empty ⇒ P) → elim' ≈ elim-empty
-elim-empty-univ _ = λ ()
-
-bang-unit : ∀ {I} {P : Profunctor I}
-  → P ⇒ unit
-bang-unit .φ = λ _ → lift tt
-bang-unit .naturality = irr[( λ _ _ _ → ≡.refl )]
-
-bang-unit-univ : ∀ {I} {P : Profunctor I}
-  → ∀ (bang' : P ⇒ unit) → bang' ≈ bang-unit
-bang-unit-univ _ = λ _ → ≡.refl
-
 -- * Variables
 
-var : ∀ {I} → I → Profunctor I
+var : ∀ {I} → I → Profunctor 0ℓ I
 var i = record {
-    Carrier = λ _ b → Lift 1ℓ (b i);
-    dimap = λ _ g p → lift (g i (lower p)) ;
+    Carrier = λ _ b → b i;
+    dimap = λ _ g p → g i p ;
     dimap-id = λ _ → ≡.refl;
     dimap-∘ = λ _ _ _ _ _ → ≡.refl
   }
 
-v0 : ∀ {I} → Profunctor (Maybe I)
+v0 : ∀ {I} → Profunctor 0ℓ (Maybe I)
 v0 = var nothing
 
-k : ∀ {I} → Profunctor I → Profunctor (Maybe I)
+k : ∀ {ℓ} {I} → Profunctor ℓ I → Profunctor ℓ (Maybe I)
 k = mapIndex just
 
+-- * Level lifting
+
+LiftP : ∀ {ℓp} {I} ℓ → Profunctor ℓp I → Profunctor (ℓp ⊔ ℓ) I
+LiftP ℓ P = record{
+    Carrier = λ a b → Lift ℓ (P [ a , b ]);
+    dimap = λ f g p → lift (dimap f g (lower p));
+    dimap-id = λ p → ≡.cong lift (dimap-id (lower p)) ;
+    dimap-∘ = λ f₁ g₁ f₂ g₂ p → ≡.cong lift (dimap-∘ f₁ g₁ f₂ g₂ (lower p))
+  }
+  where open Profunctor P
+
+liftP : ∀ {ℓp ℓ I} {P : Profunctor ℓp I} → P ⇒ LiftP ℓ P
+liftP .φ = lift
+liftP .naturality = irr[( λ _ _ _ → ≡.refl )]
+
+lowerP : ∀ {ℓp ℓ I} {P : Profunctor ℓp I} → LiftP ℓ P ⇒ P
+lowerP .φ = lower
+lowerP .naturality = irr[( λ _ _ _ → ≡.refl )]
+
+-- * Extensionality
 
 -- Theorems depending on function extensionality
 module WithExt (ext : Extensionality 1ℓ 1ℓ) where
   private
-    iext : ExtensionalityImplicit 1ℓ 1ℓ
-    iext = implicit-extensionality ext
+    ext₀₀ : Extensionality 0ℓ 0ℓ
+    ext₀₀ = lower-extensionality 1ℓ 1ℓ ext
+
+    iext₁₁ : ExtensionalityImplicit 1ℓ 1ℓ
+    iext₁₁ = implicit-extensionality ext
+
+    iext₁₀ : ExtensionalityImplicit 1ℓ 0ℓ
+    iext₁₀ = implicit-extensionality (lower-extensionality 1ℓ 1ℓ ext)
   
-  module _ {I : Set} {P Q : Profunctor I} where
+  module _ {I : Set} {P Q : Profunctor 0ℓ I} where
     private
       congNat : ∀ {nat1 nat2 : P ⇒ Q}
         → (λ {a b} → nat1 .φ {a} {b}) ≡ nat2 .φ
         → nat1 ≡ nat2
       congNat ≡.refl = ≡.refl
 
-    extNat : ∀ {nat1 nat2 : P ⇒ Q}
+    extNat₀ : ∀ {nat1 nat2 : P ⇒ Q}
       → .(nat1 ≈ nat2)
       → Irrelevant (nat1 ≡ nat2)
-    extNat {nat1 = nat1} {nat2 = nat2} eqφ =
-      irr[ congNat (iext (iext (ext eqφ))) ]
+    extNat₀ {nat1 = nat1} {nat2 = nat2} eqφ =
+      irr[ congNat (iext₁₁ (iext₁₀ (ext₀₀ eqφ))) ]
 
-  module _ {I : Set} {P Q : Profunctor I} where
+  module _ {I : Set} {P Q : Profunctor 0ℓ I} where
     private
       congIso : ∀ {iso1 iso2 : P ⇔ Q}
         → iso1 .to ≡ iso2 .to
@@ -324,11 +331,11 @@ module WithExt (ext : Extensionality 1ℓ 1ℓ) where
         → iso1 ≡ iso2
       congIso ≡.refl ≡.refl = ≡.refl
     
-    extIso : ∀ {iso1 iso2 : P ⇔ Q}
+    extIso₀ : ∀ {iso1 iso2 : P ⇔ Q}
       → .(iso1 .to ≈ iso2 .to)
       → Irrelevant (iso1 ≡ iso2)
-    extIso {iso1 = iso1} {iso2 = iso2}
-        eqTo = irr[ congIso ] <*> extNat eqTo <*> (eqFrom >>= extNat)
+    extIso₀ {iso1 = iso1} {iso2 = iso2}
+        eqTo = irr[ congIso ] <*> extNat₀ eqTo <*> (eqFrom >>= extNat₀)
       where
         to1 = iso1 .to .φ
         from1 = iso1 .from .φ
@@ -357,8 +364,8 @@ module WithExt (ext : Extensionality 1ℓ 1ℓ) where
 
     iso-rightInv : ∀ (iso : P ⇔ Q)
       → Irrelevant (RightInv (iso .to) (iso .from))
-    iso-rightInv iso = iso .to-from >>= extNat
+    iso-rightInv iso = iso .to-from >>= extNat₀
     
     iso-leftInv : ∀ (iso : P ⇔ Q)
       → Irrelevant (LeftInv (iso .to) (iso .from))
-    iso-leftInv iso = iso .from-to >>= extNat
+    iso-leftInv iso = iso .from-to >>= extNat₀
