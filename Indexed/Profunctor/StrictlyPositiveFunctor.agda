@@ -29,7 +29,9 @@ open import Indexed.Profunctor.Product
 
 module Indexed.Profunctor.StrictlyPositiveFunctor (ext : Extensionality 1ℓ 1ℓ) where
 
-open import Indexed.Profunctor.Fun ext
+open Ext1↓1↓ ext
+
+open import Indexed.Profunctor.Fun {ℓ = 0ℓ} ext₀₀
 open import Indexed.Profunctor.End ext
 
 open Profunctor
@@ -37,10 +39,10 @@ open Profunctor
 -- Syntax of strictly positive functor
 data SPos (I : Set) : Set₂ where
   idSP : SPos I
-  constantSP : Profunctor I → SPos I
+  constantSP : Profunctor 0ℓ I → SPos I
   sumSP : SPos I → SPos I → SPos I
   prodSP : SPos I → SPos I → SPos I
-  kfunSP : Profunctor I → SPos I → SPos I
+  kfunSP : Profunctor 0ℓ I → SPos I → SPos I
 
 mapIndexSPos : ∀ {I J : Set} (f : I → J)
   → SPos I → SPos J
@@ -55,7 +57,7 @@ shiftSPos = mapIndexSPos just
 
 -- Apply SPos to a Profunctor
 module _ {I : Set} where
-  ⟦_⟧ : SPos I → Profunctor I → Profunctor I
+  ⟦_⟧ : SPos I → Profunctor 0ℓ I → Profunctor 0ℓ I
   ⟦ idSP ⟧ P = P
   ⟦ constantSP A ⟧ P = A
   ⟦ sumSP F₁ F₂ ⟧ P = ⟦ F₁ ⟧ P + ⟦ F₂ ⟧ P
@@ -66,11 +68,11 @@ module _ {I : Set} where
 -- not just natural transformations
 module umap {I : Set} {a b : I → Set} where
   -- unnatural function
-  arr : Profunctor I → Profunctor I → Set₁
+  arr : Profunctor 0ℓ I → Profunctor 0ℓ I → Set
   arr P Q = P [ a , b ] → Q [ a , b ]
 
   -- the "unnatural" or "uniform" map
-  umap⟦_⟧ : ∀ (F : SPos I) (P Q : Profunctor I)
+  umap⟦_⟧ : ∀ (F : SPos I) (P Q : Profunctor 0ℓ I)
     → arr P Q → arr (⟦ F ⟧ P) (⟦ F ⟧ Q)
   umap⟦ idSP ⟧ _ _ α = α
   umap⟦ constantSP A ⟧ _ _ _ = id
@@ -78,7 +80,7 @@ module umap {I : Set} {a b : I → Set} where
   umap⟦ prodSP F₁ F₂ ⟧ P Q α = Prod.map (umap⟦ F₁ ⟧ P Q α) (umap⟦ F₂ ⟧ P Q α)
   umap⟦ kfunSP A F ⟧ P Q α = (umap⟦ F ⟧ P Q α ∘′_) 
 
-  umap⟦_⟧-cong : ∀ (F : SPos I) (P Q : Profunctor I) {α β : arr P Q}
+  umap⟦_⟧-cong : ∀ (F : SPos I) (P Q : Profunctor 0ℓ I) {α β : arr P Q}
     → (α ≗ β) → umap⟦ F ⟧ P Q α ≗ umap⟦ F ⟧ P Q β
   umap⟦ F ⟧-cong P Q {α} {β} eq = go F
     where
@@ -89,9 +91,9 @@ module umap {I : Set} {a b : I → Set} where
       go (sumSP F₁ F₂) (Sum.inj₁ fp₁) = ≡.cong Sum.inj₁ (go F₁ fp₁)
       go (sumSP F₁ F₂) (Sum.inj₂ fp₂) = ≡.cong Sum.inj₂ (go F₂ fp₂)
       go (prodSP F₁ F₂) (pair fp₁ fp₂) = ≡.cong₂ pair (go F₁ fp₁) (go F₂ fp₂)
-      go (kfunSP A F') a→fp = ext λ a → go F' (a→fp a)
+      go (kfunSP A F') a→fp = ext₀₀ λ a → go F' (a→fp a)
 
-  umap⟦_⟧-id : ∀ (F : SPos I) (P : Profunctor I)
+  umap⟦_⟧-id : ∀ (F : SPos I) (P : Profunctor 0ℓ I)
     → umap⟦ F ⟧ P P id ≗ id
   umap⟦ F ⟧-id P = go F
     where
@@ -102,9 +104,9 @@ module umap {I : Set} {a b : I → Set} where
       go (sumSP F₁ F₂) (Sum.inj₁ fp₁) = ≡.cong Sum.inj₁ (go F₁ fp₁)
       go (sumSP F₁ F₂) (Sum.inj₂ fp₂) = ≡.cong Sum.inj₂ (go F₂ fp₂)
       go (prodSP F₁ F₂) (pair fp₁ fp₂) = ≡.cong₂ pair (go F₁ fp₁) (go F₂ fp₂)
-      go (kfunSP A F') a→fp = ext λ a → go F' (a→fp a)
+      go (kfunSP A F') a→fp = ext₀₀ λ a → go F' (a→fp a)
   
-  umap⟦_⟧-∘ : ∀ (F : SPos I) (P Q R : Profunctor I)
+  umap⟦_⟧-∘ : ∀ (F : SPos I) (P Q R : Profunctor 0ℓ I)
     → (qr : arr Q R) (pq : arr P Q)
     → umap⟦ F ⟧ P R (qr ∘′ pq) ≗ umap⟦ F ⟧ Q R qr ∘′ umap⟦ F ⟧ P Q pq
   umap⟦ F ⟧-∘ P Q R qr pq = go F
@@ -116,12 +118,12 @@ module umap {I : Set} {a b : I → Set} where
       go (sumSP F₁ F₂) (Sum.inj₁ fp₁) = ≡.cong Sum.inj₁ (go F₁ fp₁)
       go (sumSP F₁ F₂) (Sum.inj₂ fp₂) = ≡.cong Sum.inj₂ (go F₂ fp₂)
       go (prodSP F₁ F₂) (pair fp₁ fp₂) = ≡.cong₂ pair (go F₁ fp₁) (go F₂ fp₂)
-      go (kfunSP A F') a→fp = ext λ a → go F' (a→fp a)
+      go (kfunSP A F') a→fp = ext₀₀ λ a → go F' (a→fp a)
 
 module _ {I : Set} where
   open umap
 
-  map⟦_⟧ : ∀ (F : SPos I) {P Q : Profunctor I}
+  map⟦_⟧ : ∀ (F : SPos I) {P Q : Profunctor 0ℓ I}
     → P ⇒ Q → (⟦ F ⟧ P ⇒ ⟦ F ⟧ Q)
   map⟦ F ⟧ {P} {Q} α .φ = umap⟦ F ⟧ P Q (α .φ)
 
@@ -142,7 +144,7 @@ module _ {I : Set} where
     )]
   map⟦ kfunSP A F ⟧ α .naturality =
     map⟦ F ⟧ α .naturality >>= λ nat# →
-    irr[ (λ f g afp → ext λ a → nat# f g (afp (dimap A g f a))) ]
+    irr[ (λ f g afp → ext₀₀ λ a → nat# f g (afp (dimap A g f a))) ]
 
   open IsFunctor
 
@@ -155,30 +157,25 @@ module _ {I : Set} where
     SPosIsFunctor {F} .promap-∘ qr pq = irr[ umap⟦ F ⟧-∘ _ _ _ (qr .φ) (pq .φ) ]
 
 -- The yoneda lemma
-module _ {I : Set} (A : Profunctor I) where
+module _ {I : Set} (A : Profunctor 0ℓ I) where
   -- Yoneda F represent (∀ r. (A -> r) -> F r)
   private
-    Yraw : SPos I → Profunctor (Maybe I)
+    Yraw : SPos I → Profunctor 0ℓ (Maybe I)
     Yraw F = fun A→r Fr
       where
-         A→r : Profunctor (Maybe I)
+         A→r : Profunctor 0ℓ (Maybe I)
          A→r = fun (k A) v0
 
-         Fr : Profunctor (Maybe I)
+         Fr : Profunctor 0ℓ (Maybe I)
          Fr = ⟦ shiftSPos F ⟧ v0
 
-  Yoneda : SPos I → Profunctor I
-  Yoneda F = EndP (Yraw F)
+  Yoneda : SPos I → Profunctor 1ℓ I
+  Yoneda F = EndP (LiftP 1ℓ (Yraw F))
 
   private
     module _ (a b : I → Set) where
-      lowerYraw : (F : SPos I)
-        → (∀ x → (A [ a , b ] → Lift 1ℓ x)
-            → ⟦ shiftSPos F ⟧ v0 [ maybe′ a x , maybe′ b x ])
-        → (⟦ F ⟧ A) [ a , b ]
-      lowerYraw F yF = _
-
-      -- liftYraw F fa x : Yraw F [ maybe′ a x , maybe′ b x ]
+      -- lowerYraw : ∀ F → (∀ x → Yraw F [ maybe′ a x , maybe′ b x ]) → (⟦ F ⟧ A) [ a , b ]
+      -- liftYraw : ∀ F → (⟦ F ⟧ A) [ a , b ] → (∀ x → Yraw F [ maybe′ a x , maybe′ b x ])
       -- 
       -- Because: 
       --   Yraw F [ maybe′ a x , maybe′ b x ]
@@ -186,13 +183,19 @@ module _ {I : Set} (A : Profunctor I) where
       --       → (⟦ shiftSPos F ⟧ v0) [ maybe′ a x , maybe′ b x ]
       --    = (k A [ maybe′ a x , maybe′ b x ] → v0 [ maybe′ b x , maybe′ a x ] )
       --       → (⟦ shiftSPos F ⟧ v0) [ maybe′ a x , maybe′ b x ]
-      --    = (A [ a , b ] → Lift 1ℓ x)
+      --    = (A [ a , b ] → x)
       --       → (⟦ shiftSPos F ⟧ v0) [ maybe′ a x , maybe′ b x ]
+
+      lowerYraw : (F : SPos I)
+        → (∀ x → (A [ a , b ] → Lift 1ℓ x)
+            → ⟦ shiftSPos F ⟧ v0 [ maybe′ a x , maybe′ b x ])
+        → (⟦ F ⟧ A) [ a , b ]
+      lowerYraw F yF = _
 
       liftYraw : (F : SPos I)
         → ((⟦ F ⟧ A) [ a , b ])
         → (x : Set)
-        → (A [ a , b ] → Lift 1ℓ x)
+        → (A [ a , b ] → x)
         → (⟦ shiftSPos F ⟧ v0) [ maybe′ a x , maybe′ b x ]
       
       liftYraw F fa x cont = go F fa
@@ -210,7 +213,7 @@ module _ {I : Set} (A : Profunctor I) where
       liftYexnat : (F : SPos I)
         → (fa : (⟦ F ⟧ A) [ a , b ])
         → {x⁻ x⁺ : Set} (h : x⁻ → x⁺)
-        → (k : A [ a , b ] → Lift 1ℓ x⁻)
+        → (k : A [ a , b ] → x⁻)
         → lmap (Yraw F) (on-nothing h) (liftYraw F fa x⁺) k
            ≡
           rmap (Yraw F) (on-nothing h) (liftYraw F fa x⁻) k
@@ -227,7 +230,7 @@ module _ {I : Set} (A : Profunctor I) where
           go (sumSP F₁ _) (Sum.inj₁ fa₁) = ≡.cong Sum.inj₁ (go F₁ fa₁)
           go (sumSP _ F₂) (Sum.inj₂ fa₂) = ≡.cong Sum.inj₂ (go F₂ fa₂)
           go (prodSP F₁ F₂) (pair fa₁ fa₂) = ≡.cong₂ pair (go F₁ fa₁) (go F₂ fa₂)
-          go (kfunSP C F') c→fa = ext λ c →
+          go (kfunSP C F') c→fa = ext₀₀ λ c →
             begin
               lmap (Yraw (kfunSP C F')) (on-nothing h) (liftYraw (kfunSP C F') c→fa x⁺) cont c
             ≡⟨⟩
@@ -258,7 +261,7 @@ module _ {I : Set} (A : Profunctor I) where
               rmap (Yraw (kfunSP C F')) (on-nothing h) (liftYraw (kfunSP C F') c→fa x⁻) cont c
             ∎
             where
-              A→r F'r : Profunctor (Maybe I)
+              A→r F'r : Profunctor 0ℓ (Maybe I)
               A→r = fun (k A) v0
               F'r = ⟦ shiftSPos F' ⟧ v0
 
@@ -274,7 +277,7 @@ module _ {I : Set} (A : Profunctor I) where
       liftYnat : (F : SPos I)
         → (fa : (⟦ F ⟧ A) [ a , b ])
         → (x : Set)
-        → (cont : A [ a' , b' ] → Lift 1ℓ x)
+        → (cont : A [ a' , b' ] → x)
         → liftYraw a' b' F (dimap (⟦ F ⟧ A) f g fa) x cont
             ≡
           dimap (Yraw F) (on-just f) (on-just g) (liftYraw a b F fa x) cont
@@ -290,15 +293,15 @@ module _ {I : Set} (A : Profunctor I) where
           go (sumSP F₁ F₂) (Sum.inj₁ fa₁) = ≡.cong Sum.inj₁ (go F₁ fa₁)
           go (sumSP F₁ F₂) (Sum.inj₂ fa₂) = ≡.cong Sum.inj₂ (go F₂ fa₂)
           go (prodSP F₁ F₂) (pair fa₁ fa₂) = ≡.cong₂ pair (go F₁ fa₁) (go F₂ fa₂)
-          go (kfunSP C F) c→fa = ext λ c → go F (c→fa (dimap C g f c))
+          go (kfunSP C F) c→fa = ext₀₀ λ c → go F (c→fa (dimap C g f c))
 
   liftY : ∀ (F : SPos I)
     → ⟦ F ⟧ A ⇒ Yoneda F
-  liftY F .φ {a} {b} fa .proj = liftYraw a b F fa
+  liftY F .φ {a} {b} fa .proj = λ x → lift (liftYraw a b F fa x)
   liftY F .φ {a} {b} fa .extranaturality = irr[ (
-      λ h → ext (liftYexnat a b F fa h)
+      λ h → ≡.cong lift (ext₀₀ (liftYexnat a b F fa h))
     ) ]
-  liftY F .naturality = irr[( λ f g fa → extEnd (Yraw F) λ x → ext (liftYnat f g F fa x))]
+  liftY F .naturality = irr[( λ f g fa → extEnd (LiftP 1ℓ (Yraw F)) λ x → ≡.cong lift (ext₀₀ (liftYnat f g F fa x)))]
 
   open NaturalIso
 

@@ -92,6 +92,10 @@ module Ext22↓ (ext : Extensionality 2ℓ 2ℓ) where
 
    open Ext21↓ (lower-extensionality 2ℓ 2ℓ ext) public
 
+module Ext1↓1↓ (ext : Extensionality 1ℓ 1ℓ) where
+   open Ext11↓ ext public
+   open Ext01↓ (lower-extensionality 1ℓ 1ℓ ext) public
+
 module Ext2↓2↓ (ext : Extensionality 2ℓ 2ℓ) where
    open Ext22↓ ext public
    open Ext12↓ (lower-extensionality 2ℓ 2ℓ ext) public
