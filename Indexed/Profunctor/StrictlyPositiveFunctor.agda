@@ -156,6 +156,54 @@ module _ {I : Set} where
     SPosIsFunctor {F} .promap-id P = irr[ umap⟦ F ⟧-id P ]
     SPosIsFunctor {F} .promap-∘ qr pq = irr[ umap⟦ F ⟧-∘ _ _ _ (qr .φ) (pq .φ) ]
 
+open MaybeIndex
+open MaybeIndexProfunctor
+
+private
+  bang : ∀ {x : Set} → x → ⊤
+  bang _ = tt
+  
+  module _ {I : Set} {A : Profunctor 0ℓ I}
+    {a b : I → Set} where
+
+    shift⟦_⟧ : (F : SPos I)
+      → (⟦ F ⟧ A) [ a , b ]
+      → (⟦ shiftSPos F ⟧ v0) [ a :: ⊤ , b :: A [ a , b ] ]
+    shift⟦ idSP ⟧ fa = fa
+    shift⟦ constantSP _ ⟧ fa = fa
+    shift⟦ sumSP F₁ F₂ ⟧ fa = Sum.map (shift⟦ F₁ ⟧) (shift⟦ F₂ ⟧) fa
+    shift⟦ prodSP F₁ F₂ ⟧ fa = Prod.map shift⟦ F₁ ⟧ shift⟦ F₂ ⟧ fa
+    shift⟦ kfunSP C F ⟧ c→fa = λ c → shift⟦ F ⟧ (c→fa c)
+
+    unshift⟦_⟧ : (F : SPos I) {x : Set}
+      → (⟦ shiftSPos F ⟧ v0) [ a :: x , b :: A [ a , b ] ]
+      → (⟦ F ⟧ A) [ a , b ]
+    unshift⟦ idSP ⟧ fa = fa
+    unshift⟦ constantSP _ ⟧ fa = fa
+    unshift⟦ sumSP F₁ F₂ ⟧ fa = Sum.map (unshift⟦ F₁ ⟧) (unshift⟦ F₂ ⟧) fa
+    unshift⟦ prodSP F₁ F₂ ⟧ fa = Prod.map unshift⟦ F₁ ⟧ unshift⟦ F₂ ⟧ fa
+    unshift⟦ kfunSP C F ⟧ c→fa = λ c → unshift⟦ F ⟧ (c→fa c)
+
+    unshift-shift-id⟦_⟧ : (F : SPos I) (fa : (⟦ F ⟧ A) [ a , b ])
+      → unshift⟦ F ⟧ (shift⟦ F ⟧ fa) ≡ fa
+    unshift-shift-id⟦ F ⟧ fa = _
+
+    shift-unshift-id⟦_⟧ : (F : SPos I) {x : Set}
+      (let Fr = ⟦ shiftSPos F ⟧ v0)
+      (fr : Fr [ a :: x , b :: A [ a , b ] ])
+      → lmap-on-nothing Fr bang (shift⟦ F ⟧ (unshift⟦ F ⟧ fr)) ≡ fr
+    shift-unshift-id⟦ F ⟧ fr = _
+
+  module _ {I} {A : Profunctor 0ℓ I} where
+    shift⟦_⟧-naturality : ∀ (F : SPos I) {a a' b b'}
+      → {f : a' ~> a} {g : b ~> b'} (fa : (⟦ F ⟧ A) [ a , b ])
+      → (let Fr = ⟦ shiftSPos F ⟧ v0)
+      → shift⟦ F ⟧ (dimap (⟦ F ⟧ A) f g fa)
+          ≡
+        rmap-on-nothing Fr (dimap A f g)
+          (dimap-on-just Fr f g (shift⟦ F ⟧ fa))
+    shift⟦ F ⟧-naturality {f = f} {g = g} fa = _
+
 -- The yoneda lemma
 module _ {I : Set} (A : Profunctor 0ℓ I) where
   -- Yoneda F represent (∀ r. (A -> r) -> F r)
@@ -173,105 +221,73 @@ module _ {I : Set} (A : Profunctor 0ℓ I) where
   Yoneda F = EndP (LiftP 1ℓ (Yraw F))
 
   private
+
     module _ (a b : I → Set) where
-      -- lowerYraw : ∀ F → (∀ x → Yraw F [ maybe′ a x , maybe′ b x ]) → (⟦ F ⟧ A) [ a , b ]
-      -- liftYraw : ∀ F → (⟦ F ⟧ A) [ a , b ] → (∀ x → Yraw F [ maybe′ a x , maybe′ b x ])
+      -- lowerYraw : ∀ F → (∀ x → Yraw F [ a :: x , b :: x ]) → (⟦ F ⟧ A) [ a , b ]
+      -- liftYraw : ∀ F → (⟦ F ⟧ A) [ a , b ] → (∀ x → Yraw F [ a :: x , b :: x ])
       -- 
       -- Because: 
-      --   Yraw F [ maybe′ a x , maybe′ b x ]
+      --   Yraw F [ a :: x , b :: x ]
       --    = fun (k A) v0 [ maybe′ b x , maybe′ a x ]
-      --       → (⟦ shiftSPos F ⟧ v0) [ maybe′ a x , maybe′ b x ]
-      --    = (k A [ maybe′ a x , maybe′ b x ] → v0 [ maybe′ b x , maybe′ a x ] )
-      --       → (⟦ shiftSPos F ⟧ v0) [ maybe′ a x , maybe′ b x ]
+      --       → (⟦ shiftSPos F ⟧ v0) [ a :: x , b :: x ]
+      --    = (k A [ a :: x , b :: x ] → v0 [ maybe′ b x , maybe′ a x ] )
+      --       → (⟦ shiftSPos F ⟧ v0) [ a :: x , b :: x ]
       --    = (A [ a , b ] → x)
-      --       → (⟦ shiftSPos F ⟧ v0) [ maybe′ a x , maybe′ b x ]
+      --       → (⟦ shiftSPos F ⟧ v0) [ a :: x , b :: x ]
 
       lowerYraw : (F : SPos I)
-        → (∀ x → (A [ a , b ] → Lift 1ℓ x)
-            → ⟦ shiftSPos F ⟧ v0 [ maybe′ a x , maybe′ b x ])
+        → (∀ x → (A [ a , b ] → x)
+            → ⟦ shiftSPos F ⟧ v0 [ a :: x , b :: x ])
         → (⟦ F ⟧ A) [ a , b ]
-      lowerYraw F yF = _
+      lowerYraw F yF = unshift⟦ F ⟧ (yF (A [ a , b ]) id)
 
       liftYraw : (F : SPos I)
         → ((⟦ F ⟧ A) [ a , b ])
         → (x : Set)
         → (A [ a , b ] → x)
-        → (⟦ shiftSPos F ⟧ v0) [ maybe′ a x , maybe′ b x ]
+        → (⟦ shiftSPos F ⟧ v0) [ a :: x , b :: x ]
       
-      liftYraw F fa x cont = go F fa
-        where
-          go : (F' : SPos I)
-            → ((⟦ F' ⟧ A) [ a , b ])
-            → (⟦ shiftSPos F' ⟧ v0) [ maybe′ a x , maybe′ b x ]
-          go idSP fa' = cont fa'
-          go (constantSP _) fa' = fa'
-          go (sumSP F₁ _) (Sum.inj₁ fa₁) = Sum.inj₁ (go F₁ fa₁)
-          go (sumSP _ F₂) (Sum.inj₂ fa₂) = Sum.inj₂ (go F₂ fa₂)
-          go (prodSP F₁ F₂) (pair fa₁ fa₂) = pair (go F₁ fa₁) (go F₂ fa₂)
-          go (kfunSP C F') c→fa = λ c → go F' (c→fa c)
+      liftYraw F fa x cont = dimap-on-nothing (⟦ shiftSPos F ⟧ v0) bang cont (shift⟦ F ⟧ fa)
 
       liftYexnat : (F : SPos I)
         → (fa : (⟦ F ⟧ A) [ a , b ])
         → {x⁻ x⁺ : Set} (h : x⁻ → x⁺)
-        → (k : A [ a , b ] → x⁻)
-        → lmap (Yraw F) (on-nothing h) (liftYraw F fa x⁺) k
+        → (cont : A [ a , b ] → x⁻)
+        → lmap-on-nothing (Yraw F) h (liftYraw F fa x⁺) cont
            ≡
-          rmap (Yraw F) (on-nothing h) (liftYraw F fa x⁻) k
+          rmap-on-nothing (Yraw F) h (liftYraw F fa x⁻) cont
       
-      liftYexnat F fa {x⁻} {x⁺} h cont = go F fa
+      liftYexnat F fa {x⁻} {x⁺} h cont = begin
+          lmap-on-nothing (Yraw F) h (liftYraw F fa x⁺) cont
+        ≡⟨⟩
+          lmap-on-nothing Fr h
+            (liftYraw F fa x⁺ (h ∘′ cont'))
+        ≡⟨⟩
+          lmap-on-nothing Fr h
+            (dimap-on-nothing Fr bang (h ∘′ cont')
+               (shift⟦ F ⟧ fa))
+        ≡⟨ dimap-on-nothing-∘ Fr _ _ _ _ (shift⟦ F ⟧ fa) ⟨
+          dimap-on-nothing Fr bang (h ∘′ cont')
+            (shift⟦ F ⟧ fa)
+        ≡⟨ dimap-on-nothing-∘ Fr _ _ _ _ (shift⟦ F ⟧ fa) ⟩
+          rmap-on-nothing Fr h
+            (dimap-on-nothing Fr bang cont'
+               (shift⟦ F ⟧ fa))
+        ≡⟨⟩
+          rmap-on-nothing Fr h (liftYraw F fa x⁻ cont')
+        ≡⟨⟩
+          rmap-on-nothing (Yraw F) h (liftYraw F fa x⁻) cont
+        ∎
         where
-          go : (F' : SPos I)
-            → (fa' : (⟦ F' ⟧ A) [ a , b ])
-            → lmap (Yraw F') (on-nothing h) (liftYraw F' fa' x⁺) cont
-                ≡
-              rmap (Yraw F') (on-nothing h) (liftYraw F' fa' x⁻) cont
-          go idSP fa' = ≡.refl
-          go (constantSP _) fa' = ≡.refl
-          go (sumSP F₁ _) (Sum.inj₁ fa₁) = ≡.cong Sum.inj₁ (go F₁ fa₁)
-          go (sumSP _ F₂) (Sum.inj₂ fa₂) = ≡.cong Sum.inj₂ (go F₂ fa₂)
-          go (prodSP F₁ F₂) (pair fa₁ fa₂) = ≡.cong₂ pair (go F₁ fa₁) (go F₂ fa₂)
-          go (kfunSP C F') c→fa = ext₀₀ λ c →
-            begin
-              lmap (Yraw (kfunSP C F')) (on-nothing h) (liftYraw (kfunSP C F') c→fa x⁺) cont c
-            ≡⟨⟩
-              lmap F'r (on-nothing h)
-                (liftYraw F' (c→fa (dimap C idᵢ idᵢ c)) x⁺ rmap-h-cont)
-            ≡⟨ ≡.cong (λ c' → lmap F'r (on-nothing h)
-                (liftYraw F' (c→fa c') x⁺ rmap-h-cont))
-              (dimap-id C c)
-            ⟩
-              lmap F'r (on-nothing h)
-                (liftYraw F' (c→fa c) x⁺ rmap-h-cont)
-            ≡⟨⟩
-              lmap (Yraw F') (on-nothing h)
-                (liftYraw F' (c→fa c) x⁺) cont
-            ≡⟨ go F' (c→fa c) ⟩
-              rmap (Yraw F') (on-nothing h)
-                (liftYraw F' (c→fa c) x⁻) cont
-            ≡⟨⟩
-              rmap F'r (on-nothing h)
-                (liftYraw F' (c→fa c) x⁻ lmap-h-cont)
-            ≡⟨ ≡.cong (λ c' → rmap F'r (on-nothing h)
-                (liftYraw F' (c→fa c') x⁻ lmap-h-cont))
-              (≡.sym (dimap-id C c))
-            ⟩
-              rmap F'r (on-nothing h)
-                (liftYraw F' (c→fa (dimap C idᵢ idᵢ c)) x⁻ lmap-h-cont)
-            ≡⟨⟩
-              rmap (Yraw (kfunSP C F')) (on-nothing h) (liftYraw (kfunSP C F') c→fa x⁻) cont c
-            ∎
-            where
-              A→r F'r : Profunctor 0ℓ (Maybe I)
-              A→r = fun (k A) v0
-              F'r = ⟦ shiftSPos F' ⟧ v0
+          open ≡.≡-Reasoning
 
-              lmap-h-cont : A→r [ maybe b x⁻ , maybe a x⁻ ]
-              lmap-h-cont = lmap A→r {b = maybe a x⁻} (on-nothing h) cont
+          Fr : Profunctor 0ℓ (Maybe I)
+          Fr = ⟦ shiftSPos F ⟧ v0
 
-              rmap-h-cont : A→r [ maybe b x⁺ , maybe a x⁺ ]
-              rmap-h-cont = rmap A→r {a = maybe b x⁺} (on-nothing h) cont
-
-              open ≡.≡-Reasoning
+          -- Equal to cont using dimap-id A,
+          -- but that equality is not needed anywhere.
+          cont' : A [ a , b ] → x⁻
+          cont' = cont ∘′ dimap A idᵢ idᵢ
     
     module _ {a a' b b' : I → Set} (f : a' ~> a) (g : b ~> b') where
       liftYnat : (F : SPos I)
@@ -280,20 +296,36 @@ module _ {I : Set} (A : Profunctor 0ℓ I) where
         → (cont : A [ a' , b' ] → x)
         → liftYraw a' b' F (dimap (⟦ F ⟧ A) f g fa) x cont
             ≡
-          dimap (Yraw F) (on-just f) (on-just g) (liftYraw a b F fa x) cont
-      liftYnat F-orig fa-orig x cont = go F-orig fa-orig
+          dimap-on-just (Yraw F) f g (liftYraw a b F fa x) cont
+
+      liftYnat F fa x cont = begin
+          liftYraw a' b' F (dimap (⟦ F ⟧ A) f g fa) x cont
+        ≡⟨⟩
+          dimap-on-nothing Fr bang cont
+            (shift⟦ F ⟧ (dimap (⟦ F ⟧ A) f g fa))
+        ≡⟨ ≡.cong (dimap-on-nothing Fr bang cont) (shift⟦ F ⟧-naturality fa) ⟩
+          dimap-on-nothing Fr bang cont
+            (rmap-on-nothing Fr (dimap A f g) (dimap-on-just Fr f g (shift⟦ F ⟧ fa)))
+        ≡⟨ dimap-on-nothing-∘ Fr bang cont id (dimap A f g)
+                ((dimap-on-just Fr f g (shift⟦ F ⟧ fa))) ⟨
+          dimap-on-nothing Fr bang (cont ∘′ dimap A f g)
+            (dimap-on-just Fr f g (shift⟦ F ⟧ fa))
+        ≡⟨ dimap-on-just-nothing-comm Fr _ _ _ _ (shift⟦ F ⟧ fa) ⟨
+          dimap-on-just Fr f g
+            (dimap-on-nothing Fr bang (cont ∘′ dimap A f g)
+              (shift⟦ F ⟧ fa))
+        ≡⟨⟩
+          dimap-on-just (Yraw F) f g (liftYraw a b F fa x) cont
+        ∎
         where
-          go : (F : SPos I)
-            → (fa : (⟦ F ⟧ A) [ a , b ])
-            → liftYraw a' b' F (dimap (⟦ F ⟧ A) f g fa) x cont
-                ≡
-              dimap (Yraw F) (on-just f) (on-just g) (liftYraw a b F fa x) cont
-          go idSP fa = ≡.refl
-          go (constantSP _) fa = ≡.refl
-          go (sumSP F₁ F₂) (Sum.inj₁ fa₁) = ≡.cong Sum.inj₁ (go F₁ fa₁)
-          go (sumSP F₁ F₂) (Sum.inj₂ fa₂) = ≡.cong Sum.inj₂ (go F₂ fa₂)
-          go (prodSP F₁ F₂) (pair fa₁ fa₂) = ≡.cong₂ pair (go F₁ fa₁) (go F₂ fa₂)
-          go (kfunSP C F) c→fa = ext₀₀ λ c → go F (c→fa (dimap C g f c))
+          open ≡.≡-Reasoning
+          Fr : Profunctor 0ℓ (Maybe I)
+          Fr = ⟦ shiftSPos F ⟧ v0
+
+  lowerY : ∀ (F : SPos I)
+    → Yoneda F ⇒ ⟦ F ⟧ A
+  lowerY F .φ {a} {b} yF = lowerYraw a b F (λ x → lower (yF .proj x))
+  lowerY F .naturality = _
 
   liftY : ∀ (F : SPos I)
     → ⟦ F ⟧ A ⇒ Yoneda F
@@ -307,7 +339,7 @@ module _ {I : Set} (A : Profunctor 0ℓ I) where
 
   yoneda : ∀ (F : SPos I)
     → Yoneda F ⇔ ⟦ F ⟧ A
-  yoneda F .to = _
+  yoneda F .to = lowerY F
   yoneda F .from = liftY F
   yoneda F .to-from = _
   yoneda F .from-to = _
