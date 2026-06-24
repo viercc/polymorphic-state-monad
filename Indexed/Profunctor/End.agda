@@ -41,46 +41,137 @@ private
 
 -- * Preliminary definitions
 
-on-just : ∀ {I : Set} {a b : I → Set} {x : Set}
-  → (a ~> b) → maybe′ a x ~> maybe′ b x
-on-just f = maybe f id
+infix 19 _::_
 
-on-nothing : ∀ {I : Set} {a : I → Set} {x x′ : Set}
-  → (x → x′) → maybe′ a x ~> maybe′ a x′
-on-nothing h = maybe (λ _ → id) h
+_::_ : ∀ {I : Set} (a : I → Set) (x : Set) → Maybe I → Set 
+_::_ = maybe′
 
-private
-  on-just-nothing-commute : ∀ {I : Set} {a b : I → Set} {x x′ : Set}
+module MaybeIndex {I : Set} where
+  on-just : ∀ {a b : I → Set} {x : Set}
+    → (a ~> b) → a :: x ~> b :: x
+  on-just f = maybe f id
+
+  on-nothing : ∀ {a : I → Set} {x x′ : Set}
+    → (x → x′) → a :: x ~> a :: x′
+  on-nothing h = maybe (λ _ → id) h
+
+  on-just-nothing-commute : ∀ {a b : I → Set} {x x′ : Set}
     → (f : a ~> b) (h : x → x′)
     → ∀ mi → (on-just f ∘ᵢ on-nothing h) mi ≡ (on-nothing h ∘ᵢ on-just f) mi
-  on-just-nothing-commute f h = λ { nothing  → ≡.refl; (just _) → ≡.refl }
+  on-just-nothing-commute _ _ = λ { (just _) → ≡.refl; nothing → ≡.refl }
 
-  on-just-id : ∀ {I : Set} (c : I → Set) y → ∀ mi → on-just {x = y} (idᵢ {a = c}) mi ≡ id
+  on-nothing-id : ∀ (a : I → Set) (x : Set)
+    → ∀ mi → on-nothing {a = a} {x = x} id mi ≡ id
+  on-nothing-id _ _ = λ { (just _) → ≡.refl; nothing → ≡.refl }
+  
+  on-nothing-∘ : ∀ {a : I → Set} {x₁ x₂ x₃ : Set}
+    → (f : x₂ → x₃) (g : x₁ → x₂)
+    → ∀ mi → on-nothing {a = a} (f ∘′ g) mi ≡ (on-nothing f ∘ᵢ on-nothing g) mi
+  on-nothing-∘ _ _ = λ { (just _) → ≡.refl; nothing → ≡.refl }
+
+  on-just-id : ∀ (c : I → Set) y → ∀ mi → on-just {x = y} (idᵢ {a = c}) mi ≡ id
   on-just-id _ _ = λ { (just _) → ≡.refl; nothing → ≡.refl }
   
   on-just-∘ : 
-      ∀ {I : Set} {a₁ a₂ a₃ : I → Set} {y}
+      ∀ {a₁ a₂ a₃ : I → Set} {y}
         → (f : a₂ ~> a₃) (g : a₁ ~> a₂)
         → ∀ mi → on-just {x = y} (f ∘ᵢ g) mi ≡ (on-just f ∘ᵢ on-just g) mi
   on-just-∘ _ _ = λ { (just _) → ≡.refl; nothing → ≡.refl }
+
+module MaybeIndexProfunctor {I} {ℓ} (P : Profunctor ℓ (Maybe I)) where
+  open MaybeIndex
+  open Profunctor P
+
+  dimap-on-nothing : ∀ {a b x x' y y'}
+    → (x' → x) → (y → y')
+    → P [ a :: x , b :: y ] → P [ a :: x' , b :: y' ]
+  dimap-on-nothing f g = dimap (on-nothing f) (on-nothing g)
+
+  lmap-on-nothing : ∀ {a b x x' y}
+    → (x' → x)
+    → P [ a :: x , b :: y ] → P [ a :: x' , b :: y ]
+  lmap-on-nothing f = dimap-on-nothing f id
+
+  rmap-on-nothing : ∀ {a b x y y'}
+    → (y → y')
+    → P [ a :: x , b :: y ] → P [ a :: x , b :: y' ]
+  rmap-on-nothing g = dimap-on-nothing id g
+
+  dimap-on-just : ∀ {a a' b b' x y}
+    → (a' ~> a) → (b ~> b')
+    → P [ a :: x , b :: y ] → P [ a' :: x , b' :: y ]
+  dimap-on-just f g = dimap (on-just f) (on-just g)
+
+  dimap-on-nothing-id : ∀ {a b x y}
+    → ∀ (p : P [ a :: x , b :: y ]) → dimap-on-nothing id id p ≡ p
+  dimap-on-nothing-id p = ≡.trans
+    (≡.cong₂ (λ f g → dimap f g p) (ext₀₀ (on-nothing-id _ _)) (ext₀₀ (on-nothing-id _ _)))
+    (dimap-id p)
+
+  dimap-on-nothing-∘ : ∀ {a b x₁ x₂ x₃ y₁ y₂ y₃}
+    → (f₃₂ : x₃ → x₂) (g₂₃ : y₂ → y₃)
+      (f₂₁ : x₂ → x₁) (g₁₂ : y₁ → y₂)
+    → dimap-on-nothing {a = a} {b = b} (f₂₁ ∘′ f₃₂) (g₂₃ ∘′ g₁₂) ≗ dimap-on-nothing f₃₂ g₂₃ ∘′ dimap-on-nothing f₂₁ g₁₂
+  dimap-on-nothing-∘ f₃₂ g₂₃ f₂₁ g₁₂ p = ≡.trans
+    (≡.cong₂ (λ f g → dimap f g p)
+      (ext₀₀ (on-nothing-∘ f₂₁ f₃₂))
+      (ext₀₀ (on-nothing-∘ g₂₃ g₁₂)))
+    (dimap-∘ (on-nothing _) (on-nothing _) (on-nothing _) (on-nothing _) p)
+
+  dimap-on-just-id : ∀ {a b x y}
+    → ∀ (p : P [ a :: x , b :: y ]) → dimap-on-just idᵢ idᵢ p ≡ p
+  dimap-on-just-id p = ≡.trans
+    (≡.cong₂ (λ f g → dimap f g p) (ext₀₀ (on-just-id _ _)) (ext₀₀ (on-just-id _ _)))
+    (dimap-id p)
+
+  dimap-on-just-∘ : ∀ {a₁ a₂ a₃ b₁ b₂ b₃ x y}
+    → (f₃₂ : a₃ ~> a₂) (g₂₃ : b₂ ~> b₃)
+      (f₂₁ : a₂ ~> a₁) (g₁₂ : b₁ ~> b₂)
+    → dimap-on-just {x = x} {y = y} (f₂₁ ∘ᵢ f₃₂) (g₂₃ ∘ᵢ g₁₂) ≗ dimap-on-just f₃₂ g₂₃ ∘′ dimap-on-just f₂₁ g₁₂
+  dimap-on-just-∘ f₃₂ g₂₃ f₂₁ g₁₂ p = ≡.trans
+    (≡.cong₂ (λ f g → dimap f g p)
+      (ext₀₀ (on-just-∘ f₂₁ f₃₂))
+      (ext₀₀ (on-just-∘ g₂₃ g₁₂)))
+    (dimap-∘ (on-just _) (on-just _) (on-just _) (on-just _) p)
+
+  dimap-on-just-nothing-comm : ∀ {a a' b b' x x' y y'}
+    → (fj : a' ~> a) (gj : b ~> b') (f : x' → x) (g : y → y')
+    → dimap-on-just fj gj ∘′ dimap-on-nothing f g ≗ dimap-on-nothing f g ∘′ dimap-on-just fj gj
+  dimap-on-just-nothing-comm fj gj f g p = begin
+      dimap-on-just fj gj (dimap-on-nothing f g p)
+    ≡⟨ dimap-∘ (on-just fj) (on-just gj) (on-nothing f) (on-nothing g) p ⟨
+      dimap (on-nothing f ∘ᵢ on-just fj) (on-just gj ∘ᵢ on-nothing g) p
+    ≡⟨ ≡.cong₂ (λ fm gm → dimap fm gm p)
+        (ext₀₀ λ { (just _) → ≡.refl; nothing → ≡.refl })
+        (ext₀₀ λ { (just _) → ≡.refl; nothing → ≡.refl }) ⟩
+      dimap (on-just fj ∘ᵢ on-nothing f) (on-nothing g ∘ᵢ on-just gj) p
+    ≡⟨ dimap-∘ (on-nothing f) (on-nothing g) (on-just fj) (on-just gj) p ⟩
+      dimap-on-nothing f g (dimap-on-just fj gj p)
+    ∎
+    where open ≡.≡-Reasoning
+
+open MaybeIndex
 
 -- * One-parameter End of a Profunctor
 
 module _ {I : Set} (P : Profunctor 1ℓ (Maybe I)) where
   open Profunctor P
+  open MaybeIndexProfunctor P
+
+  Extranaturality : (a b : I → Set)
+    → (∀ (x : Set) → P [ a :: x , b :: x ])
+    → Set₁
+  Extranaturality a b proj = ∀ {x⁻ x⁺} (h : x⁻ → x⁺)
+    → lmap-on-nothing h (proj x⁺) ≡ rmap-on-nothing h (proj x⁻)
 
   record End (a b : I → Set) : Set₁ where
     constructor mkEnd
     
     field
-      proj : ∀ (x : Set) → P [ maybe′ a x , maybe′ b x ]
-    
-    Extranaturality : Set₁
-    Extranaturality = ∀ {x⁻ x⁺} → (h : x⁻ → x⁺)
-        → lmap (on-nothing h) (proj x⁺) ≡ rmap (on-nothing h) (proj x⁻)
+      proj : ∀ (x : Set) → P [ a :: x , b :: x ]
     
     field
-      extranaturality : Irrelevant Extranaturality
+      extranaturality : Irrelevant (Extranaturality a b proj)
 
   open End public
 
@@ -103,42 +194,25 @@ module _ {I : Set} (P : Profunctor 1ℓ (Maybe I)) where
 
   private
     dimapEnd : ∀ {a a′ b b′ : I → Set} → (a′ ~> a) → (b ~> b′) → End a b → End a′ b′
-    dimapEnd f g (mkEnd p _) .proj x = dimap (on-just f) (on-just g) (p x)
+    dimapEnd f g (mkEnd p _) .proj x = dimap-on-just f g (p x)
     dimapEnd f g (mkEnd p exnat) .extranaturality =
       exnat >>= λ exnat# →
       irr[( λ {x⁻} {x⁺} h →
         begin
-          lmap (on-nothing h) (dimap (on-just f) (on-just g) (p x⁺))
-        ≡⟨ dimap-∘ _ _ _ _ (p x⁺) ⟨
-          dimap (on-just f ∘ᵢ on-nothing h) (on-just g) (p x⁺)
-        ≡⟨ ≡.cong (λ fh → dimap fh (on-just g) (p x⁺)) (ext₀₀ $ on-just-nothing-commute f h) ⟩
-          dimap (on-nothing h ∘ᵢ on-just f) (on-just g) (p x⁺)
-        ≡⟨ dimap-∘ _ _ _ _ (p x⁺) ⟩
-          dimap (on-just f) (on-just g) (lmap (on-nothing h) (p x⁺))
-        ≡⟨ ≡.cong (dimap _ _) (exnat# h) ⟩
-          dimap (on-just f) (on-just g) (rmap (on-nothing h) (p x⁻))
-        ≡⟨ dimap-∘ _ _ _ _ (p x⁻) ⟨
-          dimap (on-just f) (on-just g ∘ᵢ on-nothing h) (p x⁻)
-        ≡⟨ ≡.cong (λ gh → dimap (on-just f) gh (p x⁻)) (ext₀₀ $ on-just-nothing-commute g h) ⟩
-          dimap (on-just f) (on-nothing h ∘ᵢ on-just g) (p x⁻)
-        ≡⟨ dimap-∘ _ _ _ _ (p x⁻) ⟩
-          rmap (on-nothing h) (dimap (on-just f) (on-just g) (p x⁻))
+          lmap-on-nothing h (dimap-on-just f g (p x⁺))
+        ≡⟨ dimap-on-just-nothing-comm _ _ _ _ (p x⁺) ⟨
+          dimap-on-just f g (lmap-on-nothing h (p x⁺))
+        ≡⟨ ≡.cong (dimap-on-just f g) (exnat# h) ⟩
+          dimap-on-just f g (rmap-on-nothing h (p x⁻))
+        ≡⟨ dimap-on-just-nothing-comm _ _ _ _ (p x⁻) ⟩
+          rmap-on-nothing h (dimap-on-just f g (p x⁻))
         ∎
       )]
       where
         open ≡.≡-Reasoning
 
     dimapEnd-id : ∀ {a b} (p : End a b) → dimapEnd idᵢ idᵢ p ≡ p
-    dimapEnd-id {a} {b} p = extEnd λ x →
-        begin
-          dimap (on-just idᵢ) (on-just idᵢ) (p .proj x)
-        ≡⟨ ≡.cong₂ (λ f g → dimap f g (p .proj x)) (ext₀₀ (on-just-id a x)) (ext₀₀ (on-just-id b x)) ⟩
-          dimap idᵢ idᵢ (p .proj x)
-        ≡⟨ dimap-id (p .proj x) ⟩
-          p .proj x
-        ∎
-      where
-        open ≡.≡-Reasoning
+    dimapEnd-id p = extEnd λ x → dimap-on-just-id (p .proj x)
     
     dimapEnd-∘ :
       ∀ {a a′ a″ b b′ b″}
@@ -146,16 +220,7 @@ module _ {I : Set} (P : Profunctor 1ℓ (Maybe I)) where
         → (p : End a b)
         → dimapEnd (f₂ ∘ᵢ f₁) (g₁ ∘ᵢ g₂) p ≡ dimapEnd f₁ g₁ (dimapEnd f₂ g₂ p)
     dimapEnd-∘ f₁ g₁ f₂ g₂ p = extEnd λ x →
-        begin
-          dimap (on-just (f₂ ∘ᵢ f₁)) (on-just (g₁ ∘ᵢ g₂)) (p .proj x)
-        ≡⟨ ≡.cong₂ (λ f g → dimap f g (p .proj x)) (ext₀₀ (on-just-∘ f₂ f₁)) (ext₀₀ (on-just-∘ g₁ g₂)) ⟩
-          dimap (on-just f₂ ∘ᵢ on-just f₁) (on-just g₁ ∘ᵢ on-just g₂) (p .proj x)
-        ≡⟨ dimap-∘ _ _ _ _ (p .proj x) ⟩
-          dimap (on-just f₁) (on-just g₁) (dimap (on-just f₂) (on-just g₂) (p .proj x))
-        ∎
-        where
-          open ≡.≡-Reasoning
-          
+      dimap-on-just-∘ f₁ g₁ f₂ g₂ (p .proj x)          
   
   EndP : Profunctor 1ℓ I
   EndP .Carrier = End
@@ -165,6 +230,7 @@ module _ {I : Set} (P : Profunctor 1ℓ (Maybe I)) where
 
 module _ {I : Set} where
   open Profunctor
+  open MaybeIndexProfunctor
 
   -- 1. mapping natural transformation over End:
   --   (P ⇒ Q) → (EndP P ⇒ EndP Q)
@@ -176,13 +242,13 @@ module _ {I : Set} where
       eP .extranaturality >>= λ exnat# →
       irr[(λ {x⁻} {x⁺} h →
         begin
-          lmap Q (on-nothing h) (nat .φ (eP .proj x⁺))
+          lmap-on-nothing Q h (nat .φ (eP .proj x⁺))
         ≡⟨ naturality# _ _ _ ⟨
-          nat .φ (lmap P (on-nothing h) (eP .proj x⁺))
+          nat .φ (lmap-on-nothing P h (eP .proj x⁺))
         ≡⟨ ≡.cong (nat .φ) (exnat# h) ⟩
-          nat .φ (rmap P (on-nothing h) (eP .proj x⁻))
+          nat .φ (rmap-on-nothing P h (eP .proj x⁻))
         ≡⟨ naturality# _ _ _ ⟩
-          rmap Q (on-nothing h) (nat .φ (eP .proj x⁻))
+          rmap-on-nothing Q h (nat .φ (eP .proj x⁻))
         ∎
       )]
       where open ≡.≡-Reasoning
@@ -272,6 +338,7 @@ module _ {I : Set} {P Q : Profunctor 1ℓ (Maybe I)} where
 module _ {I : Set} {P : Profunctor 1ℓ I} {Q : Profunctor 1ℓ (Maybe I)} where
   open Fun {ℓ = 1ℓ} ext
   open Profunctor
+  open MaybeIndexProfunctor
   open NaturalIso
 
   private
@@ -279,40 +346,40 @@ module _ {I : Set} {P : Profunctor 1ℓ I} {Q : Profunctor 1ℓ (Maybe I)} where
     lmap-on-nothing-fun : ∀ {a* b* : I → Set}
         → {x x' y : Set} (h : x' → x)
         → (pq : P [ b* , a* ] → Q [ maybe′ a* x , maybe′ b* y ])
-        → ∀ p → lmap (fun (k P) Q) (on-nothing h) pq p ≡ lmap Q (on-nothing h) (pq p)
+        → ∀ p → lmap-on-nothing (fun (k P) Q) h pq p ≡ lmap-on-nothing Q h (pq p)
     lmap-on-nothing-fun {x = x} {x' = x'} h pq p =
       begin
-        lmap (fun (k P) Q) (on-nothing h) pq p
+        lmap-on-nothing (fun (k P) Q) h pq p
       ≡⟨⟩
-        (lmap Q (on-nothing h) ∘′ pq ∘′ rmap (k P) {a = maybe′ _ x} (on-nothing h)) p
+        (lmap-on-nothing Q h ∘′ pq ∘′ rmap-on-nothing (k P) {x = x'} h) p
       ≡⟨⟩
-        (lmap Q (on-nothing h) ∘′ pq ∘′ rmap P idᵢ) p
-      ≡⟨ ≡.cong (lmap Q (on-nothing h) ∘′ pq) (dimap-id P p) ⟩
-        lmap Q (on-nothing h) (pq p)
+        (lmap-on-nothing Q h ∘′ pq ∘′ dimap P idᵢ idᵢ) p
+      ≡⟨ ≡.cong (lmap-on-nothing Q h ∘′ pq) (dimap-id P p) ⟩
+        lmap-on-nothing Q h (pq p)
       ∎
       where open ≡.≡-Reasoning
     
     rmap-on-nothing-fun : ∀ {a* b* : I → Set}
         → {x y y' : Set} (h : y → y')
         → (pq : P [ b* , a* ] → Q [ maybe′ a* x , maybe′ b* y ])
-        → ∀ p → rmap (fun (k P) Q) (on-nothing h) pq p ≡ rmap Q (on-nothing h) (pq p)
+        → ∀ p → rmap-on-nothing (fun (k P) Q) h pq p ≡ rmap-on-nothing Q h (pq p)
     rmap-on-nothing-fun h pq p =
       -- Reasoning steps are omitted (as they are refl except one step),
       -- because the proof is almost same for lmap
-      ≡.cong (rmap Q (on-nothing h) ∘′ pq) (dimap-id P p)
+      ≡.cong (rmap-on-nothing Q h ∘′ pq) (dimap-id P p)
 
   EndFun⇒FunEnd : EndP (fun (k P) Q) ⇒ fun P (EndP Q)
   EndFun⇒FunEnd .φ ePQ p .proj x = ePQ .proj x p
   EndFun⇒FunEnd .φ {a*} {b*} ePQ p .extranaturality =
     ePQ .extranaturality >>= λ exnat# →
     irr[(λ {x⁻ x⁺} h → begin
-        lmap Q (on-nothing h) (ePQ .proj x⁺ p)
+        lmap-on-nothing Q h (ePQ .proj x⁺ p)
       ≡⟨ lmap-on-nothing-fun h (ePQ .proj x⁺) p ⟨
-        lmap (fun (k P) Q) (on-nothing h) (ePQ .proj x⁺) p
+        lmap-on-nothing (fun (k P) Q) h (ePQ .proj x⁺) p
       ≡⟨ ≡.cong-app (exnat# h) p ⟩
-        rmap (fun (k P) Q) (on-nothing h) (ePQ .proj x⁻) p
+        rmap-on-nothing (fun (k P) Q) h (ePQ .proj x⁻) p
       ≡⟨ rmap-on-nothing-fun h (ePQ .proj x⁻) p ⟩
-        rmap Q (on-nothing h) (ePQ .proj x⁻ p)
+        rmap-on-nothing Q h (ePQ .proj x⁻ p)
       ∎
     )]
     where open ≡.≡-Reasoning
