@@ -163,38 +163,51 @@ private
   bang : ∀ {x : Set} → x → ⊤
   bang _ = tt
   
-  module _ {I : Set} {A : Profunctor 0ℓ I}
-    {a b : I → Set} where
+  module _ {I : Set} {a b : I → Set} where
+    Fr-phantom : (F : SPos I) {y : Set}
+      → (fr : ∀ x → (⟦ shiftSPos F ⟧ v0) [ a :: x , b :: y ])
+      → {x x' : Set} (h : x' → x)
+      → lmap-on-nothing (⟦ shiftSPos F ⟧ v0) h (fr x) ≡ fr x'
+    Fr-phantom F fr h = _
+  
+  module _ {I : Set} {A : Profunctor 0ℓ I} where
+    module _ {a b : I → Set} where
+      shift⟦_⟧ : (F : SPos I)
+        → (⟦ F ⟧ A) [ a , b ]
+        → (⟦ shiftSPos F ⟧ v0) [ a :: ⊤ , b :: A [ a , b ] ]
+      shift⟦ idSP ⟧ fa = fa
+      shift⟦ constantSP _ ⟧ fa = fa
+      shift⟦ sumSP F₁ F₂ ⟧ fa = Sum.map (shift⟦ F₁ ⟧) (shift⟦ F₂ ⟧) fa
+      shift⟦ prodSP F₁ F₂ ⟧ fa = Prod.map shift⟦ F₁ ⟧ shift⟦ F₂ ⟧ fa
+      shift⟦ kfunSP C F ⟧ c→fa = λ c → shift⟦ F ⟧ (c→fa c)
 
-    shift⟦_⟧ : (F : SPos I)
-      → (⟦ F ⟧ A) [ a , b ]
-      → (⟦ shiftSPos F ⟧ v0) [ a :: ⊤ , b :: A [ a , b ] ]
-    shift⟦ idSP ⟧ fa = fa
-    shift⟦ constantSP _ ⟧ fa = fa
-    shift⟦ sumSP F₁ F₂ ⟧ fa = Sum.map (shift⟦ F₁ ⟧) (shift⟦ F₂ ⟧) fa
-    shift⟦ prodSP F₁ F₂ ⟧ fa = Prod.map shift⟦ F₁ ⟧ shift⟦ F₂ ⟧ fa
-    shift⟦ kfunSP C F ⟧ c→fa = λ c → shift⟦ F ⟧ (c→fa c)
+      unshift⟦_⟧ : (F : SPos I) {x : Set}
+        → (⟦ shiftSPos F ⟧ v0) [ a :: x , b :: A [ a , b ] ]
+        → (⟦ F ⟧ A) [ a , b ]
+      unshift⟦ idSP ⟧ fa = fa
+      unshift⟦ constantSP _ ⟧ fa = fa
+      unshift⟦ sumSP F₁ F₂ ⟧ fa = Sum.map (unshift⟦ F₁ ⟧) (unshift⟦ F₂ ⟧) fa
+      unshift⟦ prodSP F₁ F₂ ⟧ fa = Prod.map unshift⟦ F₁ ⟧ unshift⟦ F₂ ⟧ fa
+      unshift⟦ kfunSP C F ⟧ c→fa = λ c → unshift⟦ F ⟧ (c→fa c)
 
-    unshift⟦_⟧ : (F : SPos I) {x : Set}
-      → (⟦ shiftSPos F ⟧ v0) [ a :: x , b :: A [ a , b ] ]
-      → (⟦ F ⟧ A) [ a , b ]
-    unshift⟦ idSP ⟧ fa = fa
-    unshift⟦ constantSP _ ⟧ fa = fa
-    unshift⟦ sumSP F₁ F₂ ⟧ fa = Sum.map (unshift⟦ F₁ ⟧) (unshift⟦ F₂ ⟧) fa
-    unshift⟦ prodSP F₁ F₂ ⟧ fa = Prod.map unshift⟦ F₁ ⟧ unshift⟦ F₂ ⟧ fa
-    unshift⟦ kfunSP C F ⟧ c→fa = λ c → unshift⟦ F ⟧ (c→fa c)
+      unshift-shift-id⟦_⟧ : (F : SPos I) (fa : (⟦ F ⟧ A) [ a , b ])
+        → unshift⟦ F ⟧ (shift⟦ F ⟧ fa) ≡ fa
+      unshift-shift-id⟦ F ⟧ fa = _
 
-    unshift-shift-id⟦_⟧ : (F : SPos I) (fa : (⟦ F ⟧ A) [ a , b ])
-      → unshift⟦ F ⟧ (shift⟦ F ⟧ fa) ≡ fa
-    unshift-shift-id⟦ F ⟧ fa = _
+      shift-unshift-id⟦_⟧ : (F : SPos I) {x : Set}
+        (let Fr = ⟦ shiftSPos F ⟧ v0)
+        (fr : Fr [ a :: x , b :: A [ a , b ] ])
+        → lmap-on-nothing Fr bang (shift⟦ F ⟧ (unshift⟦ F ⟧ fr)) ≡ fr
+      shift-unshift-id⟦ F ⟧ fr = _
 
-    shift-unshift-id⟦_⟧ : (F : SPos I) {x : Set}
-      (let Fr = ⟦ shiftSPos F ⟧ v0)
-      (fr : Fr [ a :: x , b :: A [ a , b ] ])
-      → lmap-on-nothing Fr bang (shift⟦ F ⟧ (unshift⟦ F ⟧ fr)) ≡ fr
-    shift-unshift-id⟦ F ⟧ fr = _
+      shift-unshift-id⟦_⟧-⊤ : (F : SPos I) {x : Set}
+        (let Fr = ⟦ shiftSPos F ⟧ v0)
+        (fr : Fr [ a :: ⊤ , b :: A [ a , b ] ])
+        → shift⟦ F ⟧ (unshift⟦ F ⟧ fr) ≡ fr
+      shift-unshift-id⟦ F ⟧-⊤ fr = ≡.trans
+        (≡.sym (dimap-on-nothing-id (⟦ shiftSPos F ⟧ v0) _))
+        (shift-unshift-id⟦ F ⟧ fr)
 
-  module _ {I} {A : Profunctor 0ℓ I} where
     shift⟦_⟧-naturality : ∀ (F : SPos I) {a a' b b'}
       → {f : a' ~> a} {g : b ~> b'} (fa : (⟦ F ⟧ A) [ a , b ])
       → (let Fr = ⟦ shiftSPos F ⟧ v0)
@@ -202,7 +215,69 @@ private
           ≡
         rmap-on-nothing Fr (dimap A f g)
           (dimap-on-just Fr f g (shift⟦ F ⟧ fa))
-    shift⟦ F ⟧-naturality {f = f} {g = g} fa = _
+    shift⟦ idSP ⟧-naturality fa = ≡.refl
+    shift⟦ constantSP C ⟧-naturality {f = f} {g = g} fa =
+      ≡.sym (dimap-id C (dimap C f g fa))
+      where
+        open ≡.≡-Reasoning
+    shift⟦ sumSP F₁ _ ⟧-naturality {f = f} {g = g} (Sum.inj₁ fa) = ≡.cong _⊎_.inj₁ (shift⟦ F₁ ⟧-naturality fa)
+    shift⟦ sumSP _ F₂ ⟧-naturality {f = f} {g = g} (Sum.inj₂ fa) = ≡.cong _⊎_.inj₂ (shift⟦ F₂ ⟧-naturality fa)
+    shift⟦ prodSP F₁ F₂ ⟧-naturality {f = f} {g = g} (pair fa₁ fa₂) = ≡.cong₂ pair (shift⟦ F₁ ⟧-naturality fa₁) (shift⟦ F₂ ⟧-naturality fa₂)
+    shift⟦ kfunSP C F ⟧-naturality {f = f} {g = g} fa = ext₀₀ λ c → begin
+        shift⟦ kfunSP C F ⟧ (dimap (⟦ kfunSP C F ⟧ A) f g fa) c
+      ≡⟨⟩
+        (shift⟦ F ⟧
+          ∘′ dimap (⟦ F ⟧ A) f g
+          ∘′ fa
+          ∘′ dimap C g f) c
+      ≡⟨ shift⟦ F ⟧-naturality (fa (dimap C g f c)) ⟩
+        (rmap-on-nothing Fr (dimap A f g)
+          ∘′ dimap-on-just Fr f g
+          ∘′ shift⟦ F ⟧
+          ∘′ fa
+          ∘′ dimap C g f) c
+      ≡⟨ ≡.cong
+            (rmap-on-nothing Fr (dimap A f g)
+              ∘′ dimap-on-just Fr f g
+              ∘′ shift⟦ F ⟧
+              ∘′ fa
+              ∘′ dimap C g f)
+            (dimap-id C c) ⟨
+        (rmap-on-nothing Fr (dimap A f g)
+          ∘′ dimap-on-just Fr f g
+          ∘′ shift⟦ F ⟧
+          ∘′ fa
+          ∘′ dimap C g f
+          ∘′ rmap-on-nothing (k C) {x = ⊤} (dimap A f g)) c
+      ≡⟨⟩
+        rmap-on-nothing c→Fr (dimap A f g)
+          (dimap-on-just c→Fr f g (shift⟦ kfunSP C F ⟧ fa)) c
+      ∎
+      where
+        open ≡.≡-Reasoning
+        Fr = ⟦ shiftSPos F ⟧ v0
+        c→Fr = fun (k C) Fr
+
+    unshift⟦_⟧-naturality : ∀ (F : SPos I) {a a' b b'}
+      → {f : a' ~> a} {g : b ~> b'} (fr : (⟦ shiftSPos F ⟧ v0) [ a :: ⊤ , b :: A [ a , b ] ])
+      → (let Fr = ⟦ shiftSPos F ⟧ v0)
+      → dimap (⟦ F ⟧ A) f g (unshift⟦ F ⟧ fr)
+          ≡
+        unshift⟦ F ⟧ (
+          rmap-on-nothing Fr (dimap A f g) (dimap-on-just Fr f g fr)
+        )
+    unshift⟦ F ⟧-naturality {f = f} {g = g} fr = begin
+        (dimap (⟦ F ⟧ A) f g ∘′ unshift⟦ F ⟧) fr
+      ≡⟨ unshift-shift-id⟦ F ⟧ _ ⟨
+        (unshift⟦ F ⟧ ∘′ shift⟦ F ⟧ ∘′ dimap (⟦ F ⟧ A) f g ∘′ unshift⟦ F ⟧) fr
+      ≡⟨ {!   !} ⟩
+        (unshift⟦ F ⟧ ∘′ rmap-on-nothing Fr (dimap A f g) ∘′ dimap-on-just Fr f g ∘′ shift⟦ F ⟧ ∘′ unshift⟦ F ⟧) fr
+      ≡⟨ {!   !} ⟩
+        (unshift⟦ F ⟧ ∘′ rmap-on-nothing Fr (dimap A f g) ∘′ dimap-on-just Fr f g) fr
+      ∎
+      where
+        open ≡.≡-Reasoning
+        Fr = ⟦ shiftSPos F ⟧ v0
 
 -- The yoneda lemma
 module _ {I : Set} (A : Profunctor 0ℓ I) where
